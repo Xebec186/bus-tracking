@@ -1,0 +1,93 @@
+/* ── stat pills ── */
+.stat-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+.stat-pill {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 30px; padding: 7px 18px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.85rem; color: var(--text-muted);
+}
+.stat-pill .pill-value { font-weight: 700; color: var(--text-dark); }
+.stat-pill .pill-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── filter bar overrides ── */
+.filter-bar { margin-bottom: 14px; }
+.filter-bar .form-control,
+.filter-bar .form-select { font-size: 0.88rem; border-radius: 8px; }
+
+/* ── user table ── */
+.user-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--sidebar-bg);
+    color: #fff; font-size: 0.75rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.user-cell { display: flex; align-items: center; gap: 10px; }
+.user-name  { font-weight: 600; font-size: 0.92rem; color: var(--text-dark); line-height: 1.2; }
+.user-email { font-size: 0.78rem; color: var(--text-muted); }
+
+/* role badges */
+.badge-role-admin     { background: #ede9fe; color: #7c3aed; font-size: 0.75rem; font-weight: 700; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+.badge-role-driver    { background: #dbeafe; color: #2563eb; font-size: 0.75rem; font-weight: 700; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+.badge-role-passenger { background: #f0fdf4; color: #16a34a; font-size: 0.75rem; font-weight: 700; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+
+/* status badges */
+.badge-active    { background: #dcfce7; color: #16a34a; font-size: 0.75rem; font-weight: 600; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+.badge-inactive  { background: #f1f5f9; color: #64748b; font-size: 0.75rem; font-weight: 600; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+.badge-suspended { background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: 600; border-radius: 20px; padding: 3px 12px; display: inline-block; }
+
+/* self-row highlight */
+.self-row td { background: #fafbff !important; }
+.self-badge  { font-size: 0.68rem; font-weight: 700; background: #eff3ff; color: #2d5be3; border-radius: 20px; padding: 2px 8px; vertical-align: middle; margin-left: 4px; }
+
+/* action dropdown */
+.action-menu .dropdown-toggle {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 10px; color: var(--text-dark);
+    font-size: 0.88rem; cursor: pointer;
+}
+.action-menu .dropdown-toggle:hover { background: #f4f7ff; }
+.dropdown-item { font-size: 0.88rem; padding: 8px 16px; }
+.dropdown-item i { width: 18px; }
+.dropdown-item.text-danger:hover { background: #fee2e2; }
+.dropdown-item.disabled-action   { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
+
+/* ── Modal overrides ── */
+.modal-content  { border-radius: 16px; border: none; }
+.modal-header   { border-bottom: 1px solid var(--border); padding: 20px 24px 16px; }
+.modal-title    { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); }
+.modal-body     { padding: 24px; }
+.modal-footer   { border-top: 1px solid var(--border); padding: 16px 24px; gap: 10px; }
+.form-label     { font-weight: 600; font-size: 0.88rem; color: var(--text-dark); margin-bottom: 5px; }
+.form-control, .form-select { border: 1.5px solid #d8dde6; border-radius: 10px; padding: 9px 14px; font-size: 0.9rem; }
+.form-control:focus, .form-select:focus { border-color: #2d5be3; box-shadow: 0 0 0 3px rgba(45,91,227,0.1); }
+.form-control::placeholder { color: #b0b8cc; }
+.form-text { font-size: 0.77rem; color: var(--text-muted); margin-top: 3px; }
+
+.input-icon-wrap { position: relative; }
+.input-icon-wrap i { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: #9aa3b2; font-size: 0.95rem; pointer-events: none; }
+.input-icon-wrap .form-control { padding-left: 36px; }
+
+/* privilege-guard banner */
+.guard-banner {
+    background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px;
+    padding: 10px 14px; font-size: 0.83rem; color: #92400e;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+
+/* password strength bar */
+.strength-bar { height: 4px; border-radius: 2px; transition: width 0.3s, background 0.3s; background: #e5e9f2; margin-top: 5px; }
+.strength-weak   { width: 33%; background: #ef4444; }
+.strength-medium { width: 66%; background: #f97316; }
+.strength-strong { width: 100%; background: #22c55e; }
+
+/* pagination */
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }
+.pagination-bar .pg-info { font-size: 0.83rem; color: var(--text-muted); }
+.pg-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; font-size: 0.83rem; color: var(--text-dark); text-decoration: none; cursor: pointer; }
+.pg-btn:hover:not(.disabled) { background: #eff3ff; border-color: #2d5be3; color: #2d5be3; }
+.pg-btn.disabled { opacity: 0.4; pointer-events: none; }
+.pg-btn.active   { background: #1a3a8f; color: #fff; border-color: #1a3a8f; }
+
+/* role change select in row */
+.role-select { font-size: 0.82rem; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; background: #f8f9fc; color: var(--text-dark); }

@@ -1,0 +1,28 @@
+<header class="topbar" th:fragment="topbar">
+    <div class="dropdown">
+        <div class="topbar-user d-flex align-items-center gap-2"
+             data-bs-toggle="dropdown"
+             aria-expanded="false"
+             style="cursor: pointer;">
+
+            <div class="user-info text-end">
+                <div class="name" th:text="${adminName} ?: 'Admin User'">Admin User</div>
+                <div class="email" th:text="${adminEmail} ?: 'admin@bustrack.com'">admin@bustrack.com</div>
+            </div>
+
+            <div class="avatar"><i class="bi bi-person-fill"></i></div>
+            <i class="bi bi-chevron-down"></i>
+        </div>
+
+        <!-- Dropdown Menu -->
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <form th:action="@{/logout}" method="post" class="px-3 py-1">
+                    <button type="submit" class="dropdown-item">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</header>

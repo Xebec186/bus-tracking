@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bus Tracker - Live Tracking</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      href="../../static/css/base.css"
+      th:href="@{/css/base.css}"
+      rel="stylesheet"
+    />
+    <link
+      href="../../static/css/tracking.css"
+      th:href="@{/css/tracking.css}"
+      rel="stylesheet"
+    />
+    <style>
+      /*
+       * FIX #8: Active bus-item highlight via CSS class instead of inline style,
+       * so CSS :hover states are not overridden.
+       */
+      .bus-item--active {
+        background: #f0f4ff !important;
+      }
+
+      /*
+       * FIX #3: Base badge styles for the status span. badge-moving and
+       * badge-stopped are defined in tracking.css and extend this base.
+       */
+      .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SIDEBAR -->
+    <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+    <!-- TOPBAR -->
+    <div th:replace="~{fragments/topbar :: topbar}"></div>
+
+    <!-- MAIN -->
+    <main class="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Live Bus Tracking</h1>
+          <p>Real-time bus location monitoring</p>
+        </div>
+      </div>
+
+      <!-- Map + Bus list -->
+      <div class="tracking-layout">
+        <!-- Map -->
+        <div class="map-card">
+          <div class="map-header">
+            <h5>Map View</h5>
+            <!--
+              FIX #13: Live dot starts as "Connecting..." and updates to
+              "Live Tracking" once the WebSocket connection is established.
+            -->
+            <span id="live-dot" class="live-dot live-dot--connecting">Connecting...</span>
+          </div>
+          <!--
+            FIX #11: Defensive min-height so the map renders even if
+            tracking.css fails to load. Leaflet requires a non-zero height.
+          -->
+          <div id="map" style="min-height: 450px;"></div>
+        </div>
+
+        <!-- Active Buses panel -->
+        <div class="bus-panel">
+          <div class="bus-panel-header"><h5>Active Buses</h5></div>
+          <div class="bus-panel-body">
+            <!--
+              Thymeleaf loop — rendered server-side on initial page load.
+              FIX #3: status-badge added as base class; leading space before
+              badge-moving / badge-stopped prevents class name concatenation.
+              FIX #1: speedKmh formatted as integer via #numbers.formatInteger.
+              FIX #9: removed meaningless "return false" from the onclick.
+            -->
+            <div
+              th:each="bus : ${activeBuses}"
+              class="bus-item"
+              th:id="'bus-item-' + bus.registrationNumber"
+              th:attr="data-lat=${bus.latitude}, data-lng=${bus.longitude}, data-reg=${bus.registrationNumber}"
+              onclick="focusBus(this.dataset.lat, this.dataset.lng, this.dataset.reg)"
+            >
+              <div class="bus-item-header">
+                <span class="bus-reg" th:text="${bus.registrationNumber}">BUS-001</span>
+                <span
+                  class="status-badge"
+                  th:classappend="${bus.trackingStatus?.name() == 'MOVING'} ? ' badge-moving' : ' badge-stopped'"
+                  th:text="${#strings.capitalize(#strings.toLowerCase(bus.trackingStatus?.name()))}"
+                >Moving</span>
+              </div>
+              <div class="bus-route" th:text="${bus.currentRouteName != null ? bus.currentRouteName : 'N/A'}">
+                City Center - Airport
+              </div>
+              <div class="bus-meta">
+                <span>
+                  <i class="bi bi-send"></i>
+                  <!-- FIX #1: formatInteger removes trailing .00 from BigDecimal -->
+                  <span th:text="${#numbers.formatInteger(bus.speedKmh, 1)} + ' km/h'">45 km/h</span>
+                </span>
+                <span>
+                  <i class="bi bi-clock"></i>
+                  <span th:text="'Updated ' + bus.lastUpdated">Updated 2 mins ago</span>
+                </span>
+              </div>
+            </div>
+
+            <!--
+              Static fallback — shown only when no server-rendered buses exist.
+              The JS renderBusPanel() will replace this content after the first
+              WebSocket push. If activeBuses is non-empty this block is hidden
+              by Thymeleaf entirely.
+            -->
+            <div th:if="${activeBuses == null or activeBuses.isEmpty()}">
+              <div class="bus-item" onclick="focusBus(5.6037, -0.187, 'BUS-001')">
+                <div class="bus-item-header">
+                  <span class="bus-reg">BUS-001</span>
+                  <span class="status-badge badge-moving">Moving</span>
+                </div>
+                <div class="bus-route">City Center - Airport</div>
+                <div class="bus-meta">
+                  <span><i class="bi bi-send"></i> 45 km/h</span>
+                  <span><i class="bi bi-clock"></i> Updated 2 mins ago</span>
+                </div>
+              </div>
+              <div class="bus-item" onclick="focusBus(5.5502, -0.2174, 'BUS-002')">
+                <div class="bus-item-header">
+                  <span class="bus-reg">BUS-002</span>
+                  <span class="status-badge badge-stopped">Stopped</span>
+                </div>
+                <div class="bus-route">Downtown - Mall</div>
+                <div class="bus-meta">
+                  <span><i class="bi bi-send"></i> 0 km/h</span>
+                  <span><i class="bi bi-clock"></i> Updated 1 min ago</span>
+                </div>
+              </div>
+              <div class="bus-item" onclick="focusBus(5.6145, -0.205, 'BUS-004')">
+                <div class="bus-item-header">
+                  <span class="bus-reg">BUS-004</span>
+                  <span class="status-badge badge-moving">Moving</span>
+                </div>
+                <div class="bus-route">Park - Beach</div>
+                <div class="bus-meta">
+                  <span><i class="bi bi-send"></i> 52 km/h</span>
+                  <span><i class="bi bi-clock"></i> Updated 3 mins ago</span>
+                </div>
+              </div>
+              <div class="bus-item" onclick="focusBus(5.58, -0.19, 'BUS-005')">
+                <div class="bus-item-header">
+                  <span class="bus-reg">BUS-005</span>
+                  <span class="status-badge badge-moving">Moving</span>
+                </div>
+                <div class="bus-route">Airport - Hotel District</div>
+                <div class="bus-meta">
+                  <span><i class="bi bi-send"></i> 38 km/h</span>
+                  <span><i class="bi bi-clock"></i> Updated 1 min ago</span>
+                </div>
+              </div>
+              <div class="bus-item" onclick="focusBus(5.63, -0.17, 'BUS-007')">
+                <div class="bus-item-header">
+                  <span class="bus-reg">BUS-007</span>
+                  <span class="status-badge badge-moving">Moving</span>
+                </div>
+                <div class="bus-route">Station - University</div>
+                <div class="bus-meta">
+                  <span><i class="bi bi-send"></i> 30 km/h</span>
+                  <span><i class="bi bi-clock"></i> Updated 4 mins ago</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini stats -->
+      <div class="tracking-stats">
+        <div class="t-stat">
+          <div class="label">Total Buses</div>
+          <div
+            id="tracking-total-buses"
+            class="value"
+            th:text="${trackingStats?.totalBuses} ?: '0'"
+          >0</div>
+        </div>
+        <div class="t-stat">
+          <div class="label">Currently Active</div>
+          <div
+            id="tracking-currently-active"
+            class="value ms-green"
+            th:text="${trackingStats?.currentlyActive} ?: '0'"
+          >0</div>
+        </div>
+        <div class="t-stat">
+          <div class="label">In Maintenance</div>
+          <div
+            id="tracking-in-maintenance"
+            class="value ms-yellow"
+            th:text="${trackingStats?.inMaintenance} ?: '0'"
+          >0</div>
+        </div>
+        <div class="t-stat">
+          <div class="label">Offline</div>
+          <div
+            id="tracking-offline"
+            class="value ms-red"
+            th:text="${trackingStats?.offline} ?: '0'"
+          >0</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <script th:inline="javascript">
+      /*<![CDATA[*/
+
+      // ---------------------------------------------------------------------------
+      // Data injected by Thymeleaf (server-side). Falls back to static demo data
+      // when rendered outside the application (e.g. in a browser directly).
+      //
+      // FIX #4: The server controller already serialises busLocations using the
+      // field names "reg", "lat", "lng", "status", "route", "speed" — matching
+      // what the initial marker loop below expects. upsertMarkers() uses the DTO
+      // field names (registrationNumber, latitude, longitude, trackingStatus)
+      // which come from the WebSocket payload. Both paths are now clearly separate.
+      // ---------------------------------------------------------------------------
+      const busLocations = /*[[${busLocationsJson}]]*/ [
+        { reg: "BUS-001", lat: 5.6037,  lng: -0.187,  status: "MOVING",  route: "City Center - Airport",   speed: 45 },
+        { reg: "BUS-002", lat: 5.5502,  lng: -0.2174, status: "STOPPED", route: "Downtown - Mall",         speed: 0  },
+        { reg: "BUS-004", lat: 5.6145,  lng: -0.205,  status: "MOVING",  route: "Park - Beach",            speed: 52 },
+        { reg: "BUS-005", lat: 5.58,    lng: -0.19,   status: "MOVING",  route: "Airport - Hotel District", speed: 38 },
+        { reg: "BUS-007", lat: 5.63,    lng: -0.17,   status: "MOVING",  route: "Station - University",    speed: 30 }
+      ];
+
+      // Route polyline + stop data injected by Thymeleaf.
+      const routes = /*[[${routesJson}]]*/ [];
+
+      // ---------------------------------------------------------------------------
+      // Map initialisation
+      // ---------------------------------------------------------------------------
+      const map = L.map("map", { zoomControl: true }).setView([5.6037, -0.187], 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
+      }).addTo(map);
+
+      // ---------------------------------------------------------------------------
+      // Route lines and stop circle markers
+      // FIX #7: Use spread copy before sort() to avoid mutating the source array.
+      // ---------------------------------------------------------------------------
+      const routeLayers = [];
+      routes.forEach((route) => {
+        if (!route.stops || route.stops.length < 2) return;
+
+        const latlngs = [...route.stops]
+          .sort((a, b) => a.sequence - b.sequence)
+          .map((stop) => [stop.lat, stop.lng]);
+
+        const routeLine = L.polyline(latlngs, {
+          color: "#3b82f6",
+          weight: 3,
+          opacity: 0.7,
+          dashArray: "5, 10",
+        }).addTo(map);
+        routeLayers.push(routeLine);
+
+        route.stops.forEach((stop) => {
+          L.circleMarker([stop.lat, stop.lng], {
+            color: "#1e40af",
+            fillColor: "#3b82f6",
+            fillOpacity: 0.8,
+            radius: 6,
+          })
+            .addTo(map)
+            .bindPopup(`<strong>${esc(stop.name)}</strong><br>Route: ${esc(route.name)}`);
+        });
+      });
+
+      // ---------------------------------------------------------------------------
+      // Bus marker management
+      // ---------------------------------------------------------------------------
+      const markers = {};
+      const panelBody = document.querySelector(".bus-panel-body");
+      const liveDot   = document.getElementById("live-dot");
+
+      function busIcon(status, reg) {
+        const color = status === "MOVING" ? "#1a3a8f" : "#ca8a04";
+        return L.divIcon({
+          className: "",
+          html: `<div style="background:${color};color:#fff;font-size:0.72rem;font-weight:700;
+                 padding:4px 10px;border-radius:20px;white-space:nowrap;
+                 box-shadow:0 2px 8px rgba(0,0,0,0.25);">${esc(reg)}</div>`,
+          iconAnchor: [30, 14],
+        });
+      }
+
+      // Render initial markers from server-injected data.
+      busLocations.forEach((b) => {
+        const marker = L.marker([b.lat, b.lng], { icon: busIcon(b.status, b.reg) })
+          .addTo(map)
+          .bindPopup(`<strong>${esc(b.reg)}</strong><br>${esc(b.route)}<br>Speed: ${b.speed} km/h`);
+        markers[b.reg] = marker;
+      });
+
+      // ---------------------------------------------------------------------------
+      // FIX #5: XSS-safe HTML escaping helper used wherever user-controlled data
+      // is inserted into innerHTML or Leaflet popup content.
+      // ---------------------------------------------------------------------------
+      function esc(s) {
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      // ---------------------------------------------------------------------------
+      // Bus panel renderer (called after each WebSocket push)
+      // FIX #2: Always update panelBody — show empty state when list is empty so
+      //         stale Thymeleaf-rendered cards are not left in place.
+      // FIX #1: Speed rounded to whole number via Math.round(parseFloat(...)).
+      // FIX #5: All user-controlled strings escaped before insertion into innerHTML.
+      // ---------------------------------------------------------------------------
+      function renderBusPanel(activeBuses) {
+        if (!panelBody) return;
+
+        if (!activeBuses || activeBuses.length === 0) {
+          panelBody.innerHTML = '<p class="text-muted p-3 text-center" style="font-size:0.9rem;">No active buses at this time.</p>';
+          return;
+        }
+
+        panelBody.innerHTML = activeBuses.map((b) => {
+          const speed  = Math.round(parseFloat(b.speedKmh) || 0);
+          const status = b.trackingStatus === "MOVING" ? "Moving" : "Stopped";
+          const badge  = b.trackingStatus === "MOVING" ? "badge-moving" : "badge-stopped";
+          const route  = b.currentRouteName || "N/A";
+          const reg    = b.registrationNumber;
+          const lat    = parseFloat(b.latitude);
+          const lng    = parseFloat(b.longitude);
+          return `<div class="bus-item" id="bus-item-${esc(reg)}" onclick="focusBus(${lat},${lng},'${esc(reg)}')">
+                    <div class="bus-item-header">
+                      <span class="bus-reg">${esc(reg)}</span>
+                      <span class="status-badge ${badge}">${status}</span>
+                    </div>
+                    <div class="bus-route">${esc(route)}</div>
+                    <div class="bus-meta">
+                      <span><i class="bi bi-send"></i> ${speed} km/h</span>
+                      <span><i class="bi bi-clock"></i> Updated ${esc(b.lastUpdated || "just now")}</span>
+                    </div>
+                  </div>`;
+        }).join("");
+      }
+
+      // ---------------------------------------------------------------------------
+      // Stats panel updater
+      // ---------------------------------------------------------------------------
+      function updateStats(stats) {
+        if (!stats) return;
+        document.getElementById("tracking-total-buses").textContent      = stats.totalBuses      ?? 0;
+        document.getElementById("tracking-currently-active").textContent = stats.currentlyActive ?? 0;
+        document.getElementById("tracking-in-maintenance").textContent   = stats.inMaintenance   ?? 0;
+        document.getElementById("tracking-offline").textContent          = stats.offline         ?? 0;
+      }
+
+      // ---------------------------------------------------------------------------
+      // Map marker upsert (adds new buses, moves existing ones, removes gone ones)
+      // ---------------------------------------------------------------------------
+      function upsertMarkers(activeBuses) {
+        const incoming = new Set();
+        (activeBuses || []).forEach((b) => {
+          const reg   = b.registrationNumber;
+          const lat   = parseFloat(b.latitude);
+          const lng   = parseFloat(b.longitude);
+          const status = b.trackingStatus;
+          const route  = b.currentRouteName || "N/A";
+          const speed  = Math.round(parseFloat(b.speedKmh) || 0);
+
+          if (!reg || isNaN(lat) || isNaN(lng)) return; // guard against bad data
+
+          incoming.add(reg);
+
+          const popup = `<strong>${esc(reg)}</strong><br>${esc(route)}<br>Speed: ${speed} km/h`;
+
+          if (markers[reg]) {
+            markers[reg].setLatLng([lat, lng]);
+            markers[reg].setIcon(busIcon(status, reg));
+            markers[reg].setPopupContent(popup);
+          } else {
+            markers[reg] = L.marker([lat, lng], { icon: busIcon(status, reg) })
+              .addTo(map)
+              .bindPopup(popup);
+          }
+        });
+
+        // Remove markers for buses no longer in the payload.
+        Object.keys(markers).forEach((reg) => {
+          if (!incoming.has(reg)) {
+            map.removeLayer(markers[reg]);
+            delete markers[reg];
+          }
+        });
+      }
+
+      // ---------------------------------------------------------------------------
+      // WebSocket connection with exponential backoff reconnect
+      // FIX #6: Old socket is explicitly closed before retrying.
+      // FIX #10: Exponential backoff (5s → 10s → 20s … capped at 60s).
+      // FIX #13: live-dot updated to reflect connection state.
+      // ---------------------------------------------------------------------------
+      let reconnectDelay = 5000;
+
+      function setLiveDotState(state) {
+        if (!liveDot) return;
+        liveDot.className = "live-dot";
+        if (state === "connected") {
+          liveDot.classList.add("live-dot--connected");
+          liveDot.textContent = "Live Tracking";
+        } else if (state === "reconnecting") {
+          liveDot.classList.add("live-dot--reconnecting");
+          liveDot.textContent = "Reconnecting...";
+        } else {
+          liveDot.classList.add("live-dot--connecting");
+          liveDot.textContent = "Connecting...";
+        }
+      }
+
+      function connectTrackingSocket() {
+        let socket;
+        let stompClient;
+
+        try {
+          socket = new SockJS("/ws");
+          stompClient = Stomp.over(socket);
+        } catch (e) {
+          scheduleReconnect();
+          return;
+        }
+
+        stompClient.debug = () => {}; // suppress STOMP frame noise in console
+
+        stompClient.connect(
+          {},
+          // Success callback
+          () => {
+            reconnectDelay = 5000; // reset backoff on successful connection
+            setLiveDotState("connected");
+
+            stompClient.subscribe("/topic/tracking/locations", (message) => {
+              try {
+                const payload = JSON.parse(message.body);
+                upsertMarkers(payload.activeBuses);
+                renderBusPanel(payload.activeBuses);
+                updateStats(payload.stats);
+              } catch (parseErr) {
+                console.warn("Failed to parse tracking payload:", parseErr);
+              }
+            });
+          },
+          // Error / disconnect callback
+          () => {
+            setLiveDotState("reconnecting");
+            try { socket.close(); } catch (_) {}
+            scheduleReconnect();
+          }
+        );
+      }
+
+      function scheduleReconnect() {
+        setTimeout(connectTrackingSocket, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 60000); // cap at 60s
+      }
+
+      connectTrackingSocket();
+
+      // ---------------------------------------------------------------------------
+      // Focus a bus on the map when a panel card is clicked.
+      // FIX #8: Uses CSS class toggle (bus-item--active) instead of inline style
+      //         so CSS :hover states are not clobbered.
+      // ---------------------------------------------------------------------------
+      function focusBus(lat, lng, reg) {
+        const latNum = Number.parseFloat(lat);
+        const lngNum = Number.parseFloat(lng);
+        if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return;
+
+        map.setView([latNum, lngNum], 15);
+        if (markers[reg]) markers[reg].openPopup();
+
+        // Toggle active highlight.
+        document.querySelectorAll(".bus-item").forEach((el) => el.classList.remove("bus-item--active"));
+        const item = document.getElementById("bus-item-" + reg);
+        if (item) {
+          item.classList.add("bus-item--active");
+          item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+
+      /*]]>*/
+    </script>
+  </body>
+</html>

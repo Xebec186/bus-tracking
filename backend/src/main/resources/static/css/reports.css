@@ -1,0 +1,37 @@
+/* ── Report config card ── */
+.config-card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); padding: 24px; margin-bottom: 20px; }
+.config-card h5 { font-size: 1rem; font-weight: 700; margin-bottom: 18px; }
+.config-grid { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.config-field { display: flex; flex-direction: column; gap: 5px; }
+.config-field label { font-size: 0.82rem; font-weight: 600; color: var(--text-dark); }
+.config-field .form-control, .config-field .form-select {
+    border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-size: 0.88rem; color: var(--text-dark); min-width: 160px;
+}
+
+/* ── Summary stat cards ── */
+.report-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+.r-stat { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); padding: 20px 22px; }
+.r-stat .label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; }
+.r-stat .value { font-size: 1.7rem; font-weight: 700; color: var(--text-dark); line-height: 1; }
+.r-stat .trend { font-size: 0.8rem; font-weight: 600; margin-top: 8px; display: flex; align-items: center; gap: 4px; }
+.trend-up   { color: #22c55e; }
+.trend-meta { font-weight: 400; color: var(--text-muted); }
+.stat-icon-wrap { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+/* ── Charts row ── */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.chart-card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); padding: 22px; }
+.chart-card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+.chart-card-header h5 { font-size: 1rem; font-weight: 700; margin: 0; }
+.chart-card-header span { font-size: 0.78rem; color: var(--text-muted); }
+
+/* ── Detail table ── */
+.detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.detail-header h5 { font-size: 1rem; font-weight: 700; margin: 0; }
+.export-btns { display: flex; gap: 8px; }
+.btn-export-csv { background: #4b5a7a; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-decoration: none; }
+.btn-export-csv:hover { background: #3a4760; color: #fff; }
+.btn-export-pdf { background: #1a3a8f; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-decoration: none; }
+.btn-export-pdf:hover { background: #163080; color: #fff; }
+.revenue-cell { font-weight: 600; color: #16a34a; }

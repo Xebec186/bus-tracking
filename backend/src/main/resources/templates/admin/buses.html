@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bus Tracker - Bus Management</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+
+    <link href="../../static/css/base.css" th:href="@{/css/base.css}" rel="stylesheet" />
+    <link href="../../static/css/bus.css" th:href="@{/css/bus.css}" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ════════ SIDEBAR ════════ -->
+<div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+<!-- ════════ TOPBAR ════════ -->
+<div th:replace="~{fragments/topbar :: topbar}"></div>
+
+<!-- ════════ MAIN ════════ -->
+<main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1>Bus Management</h1>
+            <p>Manage fleet and bus assignments</p>
+        </div>
+        <button class="btn-add-bus" data-bs-toggle="modal" data-bs-target="#busModal" onclick="openAddModal()">
+            <i class="bi bi-plus-lg"></i> Add Bus
+        </button>
+    </div>
+
+    <!-- Flash messages -->
+    <div th:if="${successMessage}" class="alert alert-success flash-alert alert-dismissible fade show mb-3" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        <span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger flash-alert alert-dismissible fade show mb-3" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        <span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+        <i class="bi bi-search"></i>
+        <input type="text" id="busSearch" placeholder="Search buses by registration number..." oninput="filterTable(this.value)"/>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+        <table id="busTable">
+            <thead>
+            <tr>
+                <th>Registration Number</th>
+                <th>Make / Model</th>
+                <th>Capacity</th>
+                <th>Status</th>
+                <th>Assigned Driver</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+
+            <!-- Thymeleaf loop -->
+            <tr th:each="bus : ${buses}" th:data-reg="${bus.registrationNumber}">
+                <td class="reg-num" th:text="${bus.registrationNumber}">BUS-001</td>
+                <td th:text="${(bus.make != null ? bus.make : '') + (bus.model != null ? ' ' + bus.model : '')}">Toyota Coaster</td>
+                <td th:text="${bus.capacity} + ' seats'">45 seats</td>
+                <td>
+                        <span th:classappend="${bus.status.name() == 'ACTIVE'} ? 'badge-active' :
+                                              (${bus.status.name() == 'INACTIVE'} ? 'badge-inactive' : 'badge-maintenance')"
+                              th:text="${#strings.capitalize(#strings.toLowerCase(bus.status.name()))}">Active</span>
+                </td>
+                <td th:text="${bus.driver != null ? bus.driver.firstName + ' ' + bus.driver.lastName : 'Unassigned'}">Mike Johnson</td>
+                <td>
+                    <button class="btn-edit" title="Edit"
+                            th:attr="data-id=${bus.id}, data-reg=${bus.registrationNumber}, data-capacity=${bus.capacity}, data-make=${bus.make ?: ''}, data-model=${bus.model ?: ''}, data-status=${bus.status.name()}, data-driver-id=${bus.driver != null ? bus.driver.id : ''}"
+                            onclick="openEditModal(this.dataset.id, this.dataset.reg, this.dataset.capacity, this.dataset.make, this.dataset.model, this.dataset.status, this.dataset.driverId); return false;">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button class="btn-del" title="Delete"
+                            th:attr="data-id=${bus.id}, data-reg=${bus.registrationNumber}"
+                            onclick="confirmDelete(this.dataset.id, this.dataset.reg); return false;">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </td>
+            </tr>
+
+            <!-- Static fallback rows (shown only when buses list is empty/null) -->
+            <tr th:if="${buses == null or buses.isEmpty()}">
+                <td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-bus-front"></i>
+                        No buses found. Click <strong>+ Add Bus</strong> to get started.
+                    </div>
+                </td>
+            </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<!-- ════════════════════ ADD / EDIT MODAL ════════════════════ -->
+<div class="modal fade" id="busModal" tabindex="-1" aria-labelledby="busModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="busModalLabel">Add New Bus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- ADD form -->
+            <form id="addForm" th:action="@{/buses/add}" method="post" th:object="${busForm}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <div class="modal-body">
+                    <div class="row g-3">
+
+                        <!-- Registration Number -->
+                        <div class="col-12">
+                            <label class="form-label" for="addRegNum">Registration Number <span class="text-danger">*</span></label>
+                            <input type="text" id="addRegNum" name="registrationNumber"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('registrationNumber')} ? ' is-invalid'"
+                                   placeholder="e.g., GA-2444-24"
+                                   maxlength="20" required/>
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('registrationNumber')}"
+                                 th:errors="*{registrationNumber}"></div>
+                        </div>
+
+                        <!-- Make -->
+                        <div class="col-6">
+                            <label class="form-label" for="addMake">Make</label>
+                            <input type="text" id="addMake" name="make"
+                                   class="form-control"
+                                   placeholder="e.g., Toyota"
+                                   maxlength="50"/>
+                        </div>
+
+                        <!-- Model -->
+                        <div class="col-6">
+                            <label class="form-label" for="addModel">Model</label>
+                            <input type="text" id="addModel" name="model"
+                                   class="form-control"
+                                   placeholder="e.g., Coaster"
+                                   maxlength="50"/>
+                        </div>
+
+                        <!-- Capacity -->
+                        <div class="col-6">
+                            <label class="form-label" for="addCapacity">Capacity <span class="text-danger">*</span></label>
+                            <input type="number" id="addCapacity" name="capacity"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('capacity')} ? ' is-invalid'"
+                                   placeholder="Number of seats"
+                                   min="1" max="200" required/>
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('capacity')}"
+                                 th:errors="*{capacity}"></div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="col-6">
+                            <label class="form-label" for="addStatus">Status <span class="text-danger">*</span></label>
+                            <select id="addStatus" name="status" class="form-select" required>
+                                <option value="ACTIVE"      th:selected="${busForm?.status?.name() == 'ACTIVE'}">Active</option>
+                                <option value="INACTIVE"    th:selected="${busForm?.status?.name() == 'INACTIVE'}">Inactive</option>
+                                <option value="MAINTENANCE" th:selected="${busForm?.status?.name() == 'MAINTENANCE'}">Maintenance</option>
+                            </select>
+                        </div>
+
+                        <!-- Assigned Driver -->
+                        <div class="col-12">
+                            <label class="form-label" for="addDriver">Assigned Driver</label>
+                            <select id="addDriver" name="driverId" class="form-select">
+                                <option value="">Unassigned</option>
+                                <option th:each="driver : ${drivers}"
+                                        th:value="${driver.id}"
+                                        th:text="${driver.firstName + ' ' + driver.lastName}"
+                                        th:selected="${busForm?.driver?.id == driver.id}">
+                                    Driver Name
+                                </option>
+                            </select>
+                            <div class="form-text">Only users with the Driver role are listed.</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn-create">Create Bus</button>
+                    <button type="button" class="btn-cancel" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+
+            <!-- EDIT form (hidden by default, swapped in by JS) -->
+            <form id="editForm" th:action="@{/buses/edit}" method="post" style="display:none;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" id="editBusId" name="id"/>
+
+                <div class="modal-body">
+                    <div class="row g-3">
+
+                        <div class="col-12">
+                            <label class="form-label" for="editRegNum">Registration Number <span class="text-danger">*</span></label>
+                            <input type="text" id="editRegNum" name="registrationNumber"
+                                   class="form-control" maxlength="20" required/>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label" for="editMake">Make</label>
+                            <input type="text" id="editMake" name="make"
+                                   class="form-control" maxlength="50"/>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label" for="editModel">Model</label>
+                            <input type="text" id="editModel" name="model"
+                                   class="form-control" maxlength="50"/>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label" for="editCapacity">Capacity <span class="text-danger">*</span></label>
+                            <input type="number" id="editCapacity" name="capacity"
+                                   class="form-control" min="1" max="200" required/>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="form-label" for="editStatus">Status <span class="text-danger">*</span></label>
+                            <select id="editStatus" name="status" class="form-select" required>
+                                <option value="ACTIVE">Active</option>
+                                <option value="INACTIVE">Inactive</option>
+                                <option value="MAINTENANCE">Maintenance</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" for="editDriver">Assigned Driver</label>
+                            <select id="editDriver" name="driverId" class="form-select">
+                                <option value="">Unassigned</option>
+                                <option th:each="driver : ${drivers}"
+                                        th:value="${driver.id}"
+                                        th:text="${driver.firstName + ' ' + driver.lastName}">
+                                    Driver Name
+                                </option>
+                            </select>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn-create">Save Changes</button>
+                    <button type="button" class="btn-cancel" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:1rem; font-weight:700; color:#dc2626;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Delete Bus
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="font-size:0.9rem; color:var(--text-dark);">
+                Are you sure you want to delete <strong id="deleteRegLabel"></strong>? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <form id="deleteForm" th:action="@{/buses/delete}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" id="deleteBusId" name="id"/>
+                    <button type="submit" class="btn-del" style="border-radius:8px; padding:8px 20px; background:#dc2626; color:#fff; font-weight:600; font-size:0.88rem; border:none;">Delete</button>
+                </form>
+                <button type="button" class="btn-cancel" data-bs-dismiss="modal" style="font-size:0.88rem; padding:8px 20px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // ── Open Add modal ──
+    function openAddModal() {
+        document.getElementById('busModalLabel').textContent = 'Add New Bus';
+        document.getElementById('addForm').style.display  = '';
+        document.getElementById('editForm').style.display = 'none';
+    }
+
+    // ── Open Edit modal ──
+    function openEditModal(id, regNum, capacity, make, model, status, driverId) {
+        document.getElementById('busModalLabel').textContent = 'Edit Bus';
+        document.getElementById('addForm').style.display  = 'none';
+        document.getElementById('editForm').style.display = '';
+
+        document.getElementById('editBusId').value    = id;
+        document.getElementById('editRegNum').value   = regNum;
+        document.getElementById('editCapacity').value = capacity;
+        document.getElementById('editMake').value     = make  || '';
+        document.getElementById('editModel').value    = model || '';
+
+        const statusSel = document.getElementById('editStatus');
+        for (let opt of statusSel.options) opt.selected = (opt.value === status);
+
+        const driverSel = document.getElementById('editDriver');
+        for (let opt of driverSel.options) opt.selected = (opt.value == driverId);
+
+        new bootstrap.Modal(document.getElementById('busModal')).show();
+    }
+
+    // ── Delete confirmation ──
+    function confirmDelete(id, regNum) {
+        document.getElementById('deleteBusId').value   = id;
+        document.getElementById('deleteRegLabel').textContent = regNum;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+
+    // ── Client-side search/filter ──
+    function filterTable(query) {
+        const q = query.toLowerCase().trim();
+        document.querySelectorAll('#busTable tbody tr[data-reg]').forEach(row => {
+            const reg = (row.getAttribute('data-reg') || '').toLowerCase();
+            row.style.display = reg.includes(q) ? '' : 'none';
+        });
+    }
+
+    // ── Auto-open modal if server returned validation errors ──
+    document.addEventListener('DOMContentLoaded', function () {
+        const hasErrors = document.querySelector('.is-invalid');
+        if (hasErrors) {
+            openAddModal();
+            new bootstrap.Modal(document.getElementById('busModal')).show();
+        }
+    });
+</script>
+
+</body>
+</html>

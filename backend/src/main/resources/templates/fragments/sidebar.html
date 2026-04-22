@@ -1,0 +1,68 @@
+<aside class="sidebar" th:fragment="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-bus-front-fill"></i></div>
+        <div class="brand-text">
+            <div class="name">Bus Tracker</div>
+            <div class="sub">Admin Panel</div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <ul class="nav flex-column" style="list-style:none; padding:0;">
+            <li class="nav-item">
+                <a th:href="@{/dashboard}" class="nav-link"
+                   th:classappend="${activePage == 'dashboard'} ? 'active'">
+                    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/users}" class="nav-link"
+                   th:classappend="${activePage == 'users'} ? 'active'">
+                    <i class="bi bi-person"></i> Users
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/buses}" class="nav-link"
+                   th:classappend="${activePage == 'buses'} ? 'active'">
+                    <i class="bi bi-bus-front"></i> Buses
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/routes}" class="nav-link"
+                   th:classappend="${activePage == 'routes'} ? 'active'">
+                    <i class="bi bi-signpost-2"></i> Routes
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/stops}" class="nav-link"
+                   th:classappend="${activePage == 'stops'} ? 'active'">
+                    <i class="bi bi-geo-alt"></i> Stops
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/schedules}" class="nav-link"
+                   th:classappend="${activePage == 'schedules'} ? 'active'">
+                    <i class="bi bi-calendar3"></i> Schedules
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/tickets}" class="nav-link"
+                   th:classappend="${activePage == 'tickets'} ? 'active'">
+                    <i class="bi bi-ticket-perforated"></i> Tickets
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/tracking}" class="nav-link"
+                   th:classappend="${activePage == 'tracking'} ? 'active'">
+                    <i class="bi bi-person-bounding-box"></i> Bus Tracking
+                </a>
+            </li>
+            <li class="nav-item">
+                <a th:href="@{/reports}" class="nav-link"
+                   th:classappend="${activePage == 'reports'} ? 'active'">
+                    <i class="bi bi-bar-chart-line"></i> Reports
+                </a>
+            </li>
+        </ul>
+    </nav>
+</aside>

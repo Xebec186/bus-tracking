@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bus Tracker - Reports</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+
+    <link href="../../static/css/base.css" th:href="@{/css/base.css}" rel="stylesheet" />
+    <link href="../../static/css/reports.css" th:href="@{/css/reports.css}" rel="stylesheet"/>
+
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div th:replace="~{fragments/sidebar :: sidebar}"></div>
+
+<!-- TOPBAR -->
+<div th:replace="~{fragments/topbar :: topbar}"></div>
+
+<!-- MAIN -->
+<main class="main-content">
+    <div class="page-header">
+        <div><h1>Reporting &amp; Analytics</h1><p>Generate operational reports and system analytics</p></div>
+    </div>
+
+    <!-- ── Report Configuration ── -->
+    <div class="config-card">
+        <h5>Report Configuration</h5>
+        <form th:action="@{/reports}" method="get" class="config-grid">
+            <div class="config-field">
+                <label>Report Type</label>
+                <select name="reportType" class="form-select" th:value="${reportType}">
+                    <option value="SALES_SUMMARY"   th:selected="${reportType == 'SALES_SUMMARY'}">Sales Summary</option>
+                    <option value="ROUTE_PERFORMANCE" th:selected="${reportType == 'ROUTE_PERFORMANCE'}">Route Performance</option>
+                    <option value="BUS_OCCUPANCY"   th:selected="${reportType == 'BUS_OCCUPANCY'}">Bus Occupancy</option>
+                    <option value="REVENUE"         th:selected="${reportType == 'REVENUE'}">Revenue Report</option>
+                </select>
+            </div>
+            <div class="config-field">
+                <label>Start Date</label>
+                <input type="date" name="startDate" class="form-control"
+                       th:value="${startDate} ?: '2026-03-01'"/>
+            </div>
+            <div class="config-field">
+                <label>End Date</label>
+                <input type="date" name="endDate" class="form-control"
+                       th:value="${endDate} ?: '2026-03-14'"/>
+            </div>
+            <div class="config-field">
+                <label>Route (Optional)</label>
+                <select name="routeId" class="form-select">
+                    <option value="">All Routes</option>
+                    <option th:each="route : ${routes}"
+                            th:value="${route.id}"
+                            th:text="${route.name}"
+                            th:selected="${selectedRouteId == route.id}">City Center - Airport</option>
+                </select>
+            </div>
+            <div class="config-field">
+                <label>Bus (Optional)</label>
+                <select name="busId" class="form-select">
+                    <option value="">All Buses</option>
+                    <option th:each="bus : ${buses}"
+                            th:value="${bus.id}"
+                            th:text="${bus.registrationNumber}"
+                            th:selected="${selectedBusId == bus.id}">BUS-001</option>
+                </select>
+            </div>
+            <div class="config-field" style="justify-content:flex-end;">
+                <button type="submit" class="btn-primary-dark" style="padding:9px 24px;">Generate Report</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Summary Stat Cards ── -->
+    <div class="report-stats">
+        <div class="r-stat">
+            <div class="label">Total Tickets Sold</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="value" th:text="${reportSummary?.totalTickets} ?: '1,847'">1,847</div>
+                <div class="stat-icon-wrap" style="background:#ede9fe;"><i class="bi bi-ticket-perforated-fill" style="color:#7c3aed;"></i></div>
+            </div>
+            <div class="trend trend-up"><i class="bi bi-arrow-up-right"></i><span th:text="${reportSummary?.ticketGrowth} ?: '12%'">12%</span><span class="trend-meta">This period</span></div>
+        </div>
+        <div class="r-stat">
+            <div class="label">Total Revenue</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="value" th:text="${reportSummary?.totalRevenue} ?: '$92,350'">$92,350</div>
+                <div class="stat-icon-wrap" style="background:#dcfce7;"><i class="bi bi-currency-dollar" style="color:#16a34a;"></i></div>
+            </div>
+            <div class="trend trend-up"><i class="bi bi-arrow-up-right"></i><span th:text="${reportSummary?.revenueGrowth} ?: '18%'">18%</span><span class="trend-meta">This period</span></div>
+        </div>
+        <div class="r-stat">
+            <div class="label">Active Routes</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="value" th:text="${reportSummary?.activeRoutes} ?: '24'">24</div>
+                <div class="stat-icon-wrap" style="background:#dbeafe;"><i class="bi bi-signpost-2-fill" style="color:#2563eb;"></i></div>
+            </div>
+            <div class="trend" style="color:var(--text-muted);font-size:0.8rem;margin-top:8px;">Operating routes</div>
+        </div>
+        <div class="r-stat">
+            <div class="label">Avg Bus Occupancy</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="value" th:text="${reportSummary?.avgOccupancy} ?: '82%'">82%</div>
+                <div class="stat-icon-wrap" style="background:#ffedd5;"><i class="bi bi-people-fill" style="color:#ea580c;"></i></div>
+            </div>
+            <div class="trend trend-up"><i class="bi bi-arrow-up-right"></i><span th:text="${reportSummary?.occupancyGrowth} ?: '5%'">5%</span><span class="trend-meta">Fleet average</span></div>
+        </div>
+    </div>
+
+    <!-- ── Charts ── -->
+    <div class="charts-row">
+        <!-- Sales Trend -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h5>Sales Trend</h5>
+                <span>Last 10 days</span>
+            </div>
+            <canvas id="salesTrendChart" height="200"></canvas>
+        </div>
+        <!-- Route Performance -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h5>Route Performance</h5>
+                <span>By tickets sold</span>
+            </div>
+            <canvas id="routePerfChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Bus Usage & Occupancy chart -->
+    <div class="chart-card mb-4">
+        <div class="chart-card-header">
+            <h5>Bus Usage &amp; Occupancy</h5>
+            <span>Current period</span>
+        </div>
+        <canvas id="busOccupancyChart" height="120"></canvas>
+    </div>
+
+    <!-- ── Detailed Report Table ── -->
+    <div class="section-card">
+        <div class="detail-header">
+            <h5>Detailed Report Data</h5>
+            <div class="export-btns">
+                <a th:href="@{/reports/export/csv}" class="btn-export-csv">
+                    <i class="bi bi-file-earmark-text"></i> Export CSV
+                </a>
+                <a th:href="@{/reports/export/pdf}" class="btn-export-pdf">
+                    <i class="bi bi-download"></i> Export PDF
+                </a>
+            </div>
+        </div>
+        <div class="table-card" style="border:none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Route</th>
+                        <th>Bus</th>
+                        <th>Tickets Sold</th>
+                        <th>Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${reportData}">
+                        <td th:text="${#temporals.format(row.date,'dd/MM/yyyy')}">10/03/2026</td>
+                        <td th:text="${row.routeName}">City Center - Airport</td>
+                        <td th:text="${row.busReg}">BUS-001</td>
+                        <td th:text="${row.ticketsSold}">42</td>
+                        <td class="revenue-cell" th:text="'$' + row.revenue">$2,100</td>
+                    </tr>
+
+                    <!-- Static fallback rows -->
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>10/03/2026</td><td>City Center - Airport</td><td>BUS-001</td><td>42</td><td class="revenue-cell">$2,100</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>10/03/2026</td><td>Downtown - Mall</td><td>BUS-002</td><td>35</td><td class="revenue-cell">$1,750</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>10/03/2026</td><td>Station - University</td><td>BUS-003</td><td>48</td><td class="revenue-cell">$2,400</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>10/03/2026</td><td>Park - Beach</td><td>BUS-004</td><td>28</td><td class="revenue-cell">$1,400</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>11/03/2026</td><td>City Center - Airport</td><td>BUS-001</td><td>45</td><td class="revenue-cell">$2,250</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>11/03/2026</td><td>Downtown - Mall</td><td>BUS-002</td><td>38</td><td class="revenue-cell">$1,900</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>11/03/2026</td><td>Station - University</td><td>BUS-003</td><td>52</td><td class="revenue-cell">$2,600</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>11/03/2026</td><td>Airport - Hotel</td><td>BUS-005</td><td>31</td><td class="revenue-cell">$1,550</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>12/03/2026</td><td>City Center - Airport</td><td>BUS-001</td><td>48</td><td class="revenue-cell">$2,400</td>
+                    </tr>
+                    <tr th:if="${reportData == null or reportData.isEmpty()}">
+                        <td>12/03/2026</td><td>Park - Beach</td><td>BUS-004</td><td>35</td><td class="revenue-cell">$1,750</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+
+    const days10 = /*[[${last10Days}]]*/ ['04/03','05/03','06/03','07/03','08/03','09/03','10/03','11/03','12/03','13/03'];
+    const salesTrend   = /*[[${salesTrendData}]]*/   [3200,2800,4100,3700,4500,5100,4800,5600,4200,5900];
+    const revenueTrend = /*[[${revenueTrendData}]]*/ [3800,3100,4600,4200,5000,5800,5400,6200,4700,6600];
+
+    const routeLabels = /*[[${routePerfLabels}]]*/ ['City Center - Airport','Downtown - Mall','Station - Univ','Park - Beach','Airport - Hotel'];
+    const routeTickets = /*[[${routePerfData}]]*/  [312, 198, 245, 167, 143];
+
+    const busLabels    = /*[[${busOccLabels}]]*/   ['BUS-001','BUS-002','BUS-003','BUS-004','BUS-005'];
+    const busTrips     = /*[[${busTripsData}]]*/   [42, 37, 35, 41, 38];
+    const busOccupancy = /*[[${busOccData}]]*/     [85, 78, 72, 88, 82];
+
+    const gridColor = '#e5e9f2';
+
+    // ── Sales Trend (line) ──
+    new Chart(document.getElementById('salesTrendChart'), {
+        type: 'line',
+        data: {
+            labels: days10,
+            datasets: [
+                { label: 'Tickets', data: salesTrend,   borderColor: '#ea580c', backgroundColor: 'rgba(234,88,12,0.08)',  borderWidth: 2.5, pointBackgroundColor: '#ea580c', fill: true,  tension: 0.4 },
+                { label: 'Revenue', data: revenueTrend, borderColor: '#1a3a8f', backgroundColor: 'rgba(26,58,143,0.05)',  borderWidth: 2.5, pointBackgroundColor: '#1a3a8f', fill: false, tension: 0.4 }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { grid: { color: gridColor } }, y: { beginAtZero: true, grid: { color: gridColor } } } }
+    });
+
+    // ── Route Performance (horizontal bar) ──
+    new Chart(document.getElementById('routePerfChart'), {
+        type: 'bar',
+        data: {
+            labels: routeLabels,
+            datasets: [{ label: 'Tickets Sold', data: routeTickets, backgroundColor: '#1a3a8f', borderRadius: 6 }]
+        },
+        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: gridColor } }, y: { grid: { display: false } } } }
+    });
+
+    // ── Bus Usage & Occupancy (grouped bar) ──
+    new Chart(document.getElementById('busOccupancyChart'), {
+        type: 'bar',
+        data: {
+            labels: busLabels,
+            datasets: [
+                { label: 'Number of Trips', data: busTrips,     backgroundColor: '#1a3a8f', borderRadius: 5 },
+                { label: 'Occupancy %',     data: busOccupancy, backgroundColor: '#22c55e', borderRadius: 5 }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: gridColor } } } }
+    });
+
+    /*]]>*/
+</script>
+</body>
+</html>
