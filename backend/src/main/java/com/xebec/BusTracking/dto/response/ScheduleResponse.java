@@ -13,7 +13,7 @@ import java.time.LocalTime;
 @Getter
 @Setter
 public class ScheduleResponse {
-    private Long id;
+    private String id; // Changed to String to accommodate unique composite ID
     private Long routeId;
     private Long busId;
     private String scheduleDay;
@@ -24,8 +24,11 @@ public class ScheduleResponse {
     private String status;
 
     public static ScheduleResponse from(Schedule schedule, ScheduleDay scheduleDay) {
+        // Use a composite ID to ensure uniqueness in lists when a schedule has multiple days
+        String uniqueId = schedule.getId() + "_" + scheduleDay.getDay().toString();
+        
         return ScheduleResponse.builder()
-                .id(schedule.getId())
+                .id(uniqueId)
                 .routeId(schedule.getRoute().getId())
                 .busId(schedule.getBus().getId())
                 .scheduleDay(scheduleDay.getDay().toString())

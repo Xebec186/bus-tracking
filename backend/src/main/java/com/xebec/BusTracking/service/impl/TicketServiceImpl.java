@@ -206,4 +206,5 @@ public class TicketServiceImpl implements TicketService {
         return pricePerSegment.multiply(segmentsCount)
                 .setScale(2, RoundingMode.HALF_UP);
     }
+
 }

@@ -14,6 +14,7 @@ import AppButton from "../../components/common/AppButton";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { ErrorBanner } from "../../components/common/EmptyState";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
+import { unwrapApiData } from "../../api/responseUtils";
 
 export default function RouteDetailScreen({ route: navRoute, navigation }) {
   const { routeId, routeName } = navRoute.params;
@@ -21,6 +22,8 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
   const [schedules, setSchedules] = useState([]);
   const [routeStops, setRouteStops] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [originStopId, setOriginStopId] = useState(null);
+  const [destinationStopId, setDestinationStopId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -34,9 +37,19 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
           passengerApi.getSchedulesByRoute(routeId),
           passengerApi.getRouteStops(routeId),
         ]);
-        setRouteData(rRes.data);
-        setSchedules(sRes.data);
-        setRouteStops(rsRes.data);
+        const route = unwrapApiData(rRes);
+        const schedulesData = unwrapApiData(sRes);
+        const stopsData = unwrapApiData(rsRes);
+        setRouteData(route);
+        setSchedules(Array.isArray(schedulesData) ? schedulesData : []);
+        setRouteStops(Array.isArray(stopsData) ? stopsData : []);
+        if (Array.isArray(stopsData) && stopsData.length >= 2) {
+          setOriginStopId(stopsData[0].stopId ?? stopsData[0].id);
+          setDestinationStopId(
+            stopsData[stopsData.length - 1].stopId ??
+              stopsData[stopsData.length - 1].id,
+          );
+        }
       } catch {
         setError("Failed to load route details.");
       } finally {
@@ -47,7 +60,11 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
   }, [routeId]);
 
   if (loading) return <LoadingSpinner fullScreen message="Loading route…" />;
+  const origin = routeStops.find((s) => (s.stopId ?? s.id) === originStopId);
 
+  const destination = routeStops.find(
+    (s) => (s.stopId ?? s.id) === destinationStopId,
+  );
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* Back header */}
@@ -127,26 +144,74 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
         {routeStops.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Stops</Text>
-            {routeStops.map((stop, idx) => (
-              <View key={stop.id ?? idx} style={styles.stopRow}>
-                <View style={styles.stopIndicator}>
-                  <View
-                    style={[
-                      styles.stopDot,
-                      idx === 0 || idx === routeStops.length - 1
-                        ? styles.stopDotTerminal
-                        : {},
-                    ]}
-                  />
-                  {idx < routeStops.length - 1 && (
-                    <View style={styles.stopLine} />
-                  )}
+            {routeStops.map((stop, idx) => {
+              const currentStopId = stop.stopId ?? stop.id;
+              const isOrigin = originStopId === currentStopId;
+              const isDestination = destinationStopId === currentStopId;
+              return (
+                <View key={`stop-${stop.id ?? idx}`} style={styles.stopRow}>
+                  <View style={styles.stopIndicator}>
+                    <View
+                      style={[
+                        styles.stopDot,
+                        idx === 0 || idx === routeStops.length - 1
+                          ? styles.stopDotTerminal
+                          : {},
+                      ]}
+                    />
+                    {idx < routeStops.length - 1 && (
+                      <View style={styles.stopLine} />
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.stopSelector}
+                    onPress={() => {
+                      if (idx === routeStops.length - 1) return;
+                      setOriginStopId(currentStopId);
+                      if (
+                        destinationStopId === currentStopId ||
+                        idx >= routeStops.length - 1
+                      ) {
+                        const next = routeStops[idx + 1];
+                        setDestinationStopId(next.stopId ?? next.id);
+                      }
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.stopBadge,
+                        (isOrigin || isDestination) && { color: "green" },
+                      ]}
+                    >
+                      {isOrigin ? "Origin" : "Set Origin"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.stopSelector}
+                    onPress={() => {
+                      if (idx === 0) return;
+                      setDestinationStopId(currentStopId);
+                      if (originStopId === currentStopId || idx <= 0) {
+                        const prev = routeStops[idx - 1];
+                        setOriginStopId(prev.stopId ?? prev.id);
+                      }
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.stopBadge,
+                        (isOrigin || isDestination) && { color: "green" },
+                      ]}
+                    >
+                      {isDestination ? "Destination" : "Set Destination"}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stopName}>
+                    {stop.name ?? `Stop ${idx + 1}`}
+                  </Text>
                 </View>
-                <Text style={styles.name}>
-                  {stop.name ?? `Stop ${idx + 1}`}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -158,9 +223,9 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
               No schedules available for this route.
             </Text>
           ) : (
-            schedules.map((s) => (
+            schedules.map((s, index) => (
               <TouchableOpacity
-                keyExtractor={(item, index) => `${item.id}-${index}`}
+                key={s.id ? String(s.id) : `schedule-${index}`}
                 style={[
                   styles.scheduleCard,
                   selected?.id === s.id && styles.scheduleSelected,
@@ -174,7 +239,7 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
                     {s.departureTime ?? s.startTime ?? "—"}
                   </Text>
                   <Text style={styles.scheduleDay}>
-                    {s.dayOfWeek ?? s.days ?? "Daily"}
+                    {s.scheduleDay ?? s.dayOfWeek ?? s.days ?? "Daily"}
                   </Text>
                 </View>
                 <View style={styles.scheduleRight}>
@@ -211,6 +276,10 @@ export default function RouteDetailScreen({ route: navRoute, navigation }) {
               routeId,
               routeName,
               schedule: selected,
+              originStopId,
+              destinationStopId,
+              origin,
+              destination,
             })
           }
           style={styles.ctaBtn}
@@ -318,6 +387,8 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     paddingVertical: 4,
   },
+  stopSelector: { marginRight: 8, paddingVertical: 4 },
+  stopBadge: { fontSize: 11, color: COLORS.primary, fontWeight: "600" },
 
   scheduleCard: {
     flexDirection: "row",

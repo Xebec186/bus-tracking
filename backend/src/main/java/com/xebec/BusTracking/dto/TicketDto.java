@@ -41,4 +41,9 @@ public class TicketDto {
     private String paymentMethod;
 
     private String paymentReference;
+
+    private String routeName;
+    private String origin;
+    private String destination;
+
 }

@@ -63,6 +63,6 @@ public class TripLifecycleScheduler {
             return;
         }
         tripRepository.findByScheduleIdAndStatus(schedule.getId(), TripStatus.ACTIVE)
-                .forEach(trip -> tripService.recordArrival(trip.getId(), now));
+                .forEach(trip -> tripService.systemRecordArrival(trip.getId(), now));
     }
 }

@@ -8,7 +8,13 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 import { STORAGE_KEYS } from "../constants";
-import { setLogoutCallback } from "../api/axiosClient";
+import {
+  clearSessionStorage,
+  registerLogoutHandler,
+  registerRefreshHandler,
+  saveTokens,
+} from "../api/authSession";
+import { authApi } from "../api/authApi";
 
 const AuthContext = createContext(null);
 
@@ -31,9 +37,15 @@ function decodeToken(token) {
 
     const firstName = decoded.firstName ?? "";
     const lastName = decoded.lastName ?? "";
+    const phoneNumber = decoded.phoneNumber ?? "";
     // Compose a display name; fall back gracefully if claims are absent
     const displayName =
       [firstName, lastName].filter(Boolean).join(" ").trim() || decoded.sub;
+
+    const rawRole = decoded.role ?? decoded.roles?.[0] ?? "PASSENGER";
+    const normalizedRole = String(rawRole)
+      .toUpperCase()
+      .replace(/^ROLE_/, "");
 
     return {
       token,
@@ -41,8 +53,9 @@ function decodeToken(token) {
       email: decoded.sub,
       firstName,
       lastName,
+      phoneNumber,
       displayName, // "Ama Owusu" — use this for UI
-      role: decoded.role ?? decoded.roles?.[0] ?? "PASSENGER",
+      role: normalizedRole,
       exp: decoded.exp,
     };
   } catch {
@@ -80,28 +93,31 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (tokenResponse) => {
-    const token = tokenResponse.token;
+    const token = tokenResponse?.token ?? tokenResponse?.accessToken;
     const decoded = decodeToken(token);
     if (!decoded) throw new Error("Invalid token received");
-    await AsyncStorage.multiSet([
-      [STORAGE_KEYS.TOKEN, token],
-      [STORAGE_KEYS.REFRESH_TOKEN, tokenResponse.refreshToken],
-    ]);
+    await saveTokens({ token, refreshToken: tokenResponse?.refreshToken });
     setUser(decoded);
     return decoded;
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([
-      STORAGE_KEYS.TOKEN,
-      STORAGE_KEYS.REFRESH_TOKEN,
-      STORAGE_KEYS.USER,
-    ]);
+    await clearSessionStorage();
     setUser(null);
   }, []);
 
   useEffect(() => {
-    setLogoutCallback(logout);
+    registerLogoutHandler(logout);
+    registerRefreshHandler(async () => {
+      const currentRefreshToken = await AsyncStorage.getItem(
+        STORAGE_KEYS.REFRESH_TOKEN,
+      );
+      if (!currentRefreshToken) {
+        throw new Error("Missing refresh token");
+      }
+      const res = await authApi.refresh(currentRefreshToken);
+      return res.data;
+    });
   }, [logout]);
 
   const value = {

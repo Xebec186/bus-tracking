@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/common/LeafletMap';
 import { useTracking } from '../../context/TrackingContext';
@@ -10,13 +10,14 @@ import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from '../../constants';
 
 // Greater Accra default centre
 const ACCRA_REGION = {
-  latitude:       5.6037,
-  longitude:     -0.1870,
-  latitudeDelta:  0.12,
-  longitudeDelta: 0.12,
+  latitude:       5.5800,
+  longitude:     -0.2100,
+  latitudeDelta:  0.15,
+  longitudeDelta: 0.15,
 };
 
 export default function BusTrackingScreen({ route: navRoute, navigation }) {
+  const insets = useSafeAreaInsets();
   const routeId = navRoute?.params?.routeId ?? null;
   const { busLocations, wsConnected, wsError, connect, disconnect, seedBuses } = useTracking();
 
@@ -28,25 +29,29 @@ export default function BusTrackingScreen({ route: navRoute, navigation }) {
     let mounted = true;
 
     async function init() {
-      // 1. Initial REST load — prevent empty-map flash
+      // 1. Initial REST load
       try {
         const res = await trackingApi.getBuses();
         const buses = res.data?.content ?? res.data ?? [];
         if (mounted) seedBuses(buses);
-      } catch { /* silently proceed to WebSocket */ }
+      } catch (err) {
+        console.warn("[Tracking] Failed initial bus load", err);
+      }
 
       // 2. Load route geometry if a routeId was passed
       if (routeId) {
         try {
-          const res = await trackingApi.getRouteTracking(routeId);
-          const coords = res.data?.coordinates ?? res.data?.path ?? [];
+          const res = await trackingApi.getRoutePath(routeId);
+          const coords = res.data?.coordinates ?? [];
           if (mounted) {
             setRouteCoords(coords.map((c) => ({
-              latitude:  c.lat ?? c.latitude,
-              longitude: c.lng ?? c.longitude,
+              latitude:  Number(c.latitude),
+              longitude: Number(c.longitude),
             })));
           }
-        } catch { /* map still works without polyline */ }
+        } catch (err) {
+          console.warn("[Tracking] Failed route path load", err);
+        }
       }
 
       // 3. Start STOMP connection
@@ -59,9 +64,14 @@ export default function BusTrackingScreen({ route: navRoute, navigation }) {
       mounted = false;
       disconnect();
     };
-  }, []);
+  }, [routeId, connect, disconnect, seedBuses]);
 
   const buses = Object.values(busLocations);
+
+  // Filter buses if looking at a specific route
+  const filteredBuses = routeId 
+    ? buses.filter(b => b.routeId === routeId || String(b.routeId) === String(routeId))
+    : buses;
 
   // Fit map to visible buses and route
   function fitMap() {
@@ -71,9 +81,9 @@ export default function BusTrackingScreen({ route: navRoute, navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <View style={styles.safe}>
       {/* Header */}
-      <View style={styles.topBar}>
+      <SafeAreaView edges={['top']} style={styles.topBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -84,14 +94,14 @@ export default function BusTrackingScreen({ route: navRoute, navigation }) {
         <View style={{ flex: 1, marginLeft: SPACING.sm }}>
           <Text style={styles.topTitle}>Live Tracking</Text>
           <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-            {routeId ? `Route #${routeId}` : 'All Active Buses'}
+            {routeId ? `Viewing Route #${routeId}` : 'All Active Buses'}
           </Text>
         </View>
         <View style={styles.statusDot}>
           <View style={[styles.dot, { backgroundColor: wsConnected ? COLORS.accent : COLORS.warning }]} />
           <Text style={styles.statusText}>{wsConnected ? 'Live' : 'Offline'}</Text>
         </View>
-      </View>
+      </SafeAreaView>
 
       {/* WS error banner */}
       <WsBanner message={wsError} />
@@ -101,21 +111,23 @@ export default function BusTrackingScreen({ route: navRoute, navigation }) {
         ref={mapRef}
         style={styles.map}
         initialRegion={ACCRA_REGION}
-        markers={buses}
+        markers={filteredBuses}
         routeCoords={routeCoords}
       />
 
-      {/* Bus count overlay */}
-      <View style={styles.overlay}>
+      {/* Bus count overlay - using insets for bottom positioning */}
+      <View style={[styles.overlay, { bottom: Math.max(insets.bottom, SPACING.md) + SPACING.md }]}>
         <View style={styles.countCard}>
           <Ionicons name="bus" size={16} color={COLORS.primary} />
-          <Text style={styles.countText}>{buses.length} active bus{buses.length !== 1 ? 'es' : ''}</Text>
+          <Text style={styles.countText}>
+            {filteredBuses.length} active bus{filteredBuses.length !== 1 ? 'es' : ''}
+          </Text>
         </View>
         <TouchableOpacity style={styles.fitBtn} onPress={fitMap} accessibilityLabel="Fit map to buses">
           <Ionicons name="expand-outline" size={20} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -138,21 +150,8 @@ const styles = StyleSheet.create({
 
   map: { flex: 1 },
 
-  busMarker: {
-    width:           36,
-    height:          36,
-    borderRadius:    18,
-    backgroundColor: COLORS.accent,
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     2,
-    borderColor:     COLORS.white,
-    ...SHADOW.md,
-  },
-
   overlay: {
     position:        'absolute',
-    bottom:          SPACING.xl,
     left:            SPACING.md,
     right:           SPACING.md,
     flexDirection:   'row',

@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { passengerApi } from "../../api/passengerApi";
 import { useAuth } from "../../context/AuthContext";
+import { unwrapApiData } from "../../api/responseUtils";
 import RouteCard from "../../components/passenger/RouteCard";
 import { SkeletonList } from "../../components/common/LoadingSpinner";
 import { EmptyState, ErrorBanner } from "../../components/common/EmptyState";
@@ -31,9 +32,10 @@ export default function HomeScreen({ navigation }) {
     else setLoading(true);
     setError(null);
     try {
-      const res = await passengerApi.getRoutes();
-      const data = res.data?.content ?? res.data ?? [];
-      console.log(data);
+      // Use getActiveRoutes to only show routes with schedules
+      const res = await passengerApi.getActiveRoutes();
+      const raw = unwrapApiData(res);
+      const data = raw?.content ?? raw ?? [];
       setRoutes(data);
       setFiltered(data);
     } catch {
@@ -48,7 +50,7 @@ export default function HomeScreen({ navigation }) {
     fetchRoutes();
   }, [fetchRoutes]);
 
-  // Local search filter — falls back to backend search on submit
+  // Local search filter
   function handleSearch(text) {
     setQuery(text);
     if (!text.trim()) {
@@ -61,26 +63,17 @@ export default function HomeScreen({ navigation }) {
         (r) =>
           r.name?.toLowerCase().includes(q) ||
           r.origin?.toLowerCase().includes(q) ||
-          r.destination?.toLowerCase().includes(q),
+          r.destination?.toLowerCase().includes(q) ||
+          r.number?.toLowerCase().includes(q) ||
+          r.startStopName?.toLowerCase().includes(q) ||
+          r.endStopName?.toLowerCase().includes(q),
       ),
     );
   }
 
-  async function handleSearchSubmit() {
-    if (!query.trim()) {
-      setFiltered(routes);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await passengerApi.searchRoute({ query: query.trim() });
-      const data = res.data?.content ?? res.data ?? [];
-      setFiltered(data);
-    } catch {
-      // Silently fall back to local filter already applied
-    } finally {
-      setLoading(false);
-    }
+  function handleClearSearch() {
+    setQuery("");
+    setFiltered(routes);
   }
 
   function getGreeting() {
@@ -97,9 +90,8 @@ export default function HomeScreen({ navigation }) {
         <View>
           <Text style={styles.greeting}>{getGreeting()},</Text>
           <Text style={styles.userName} numberOfLines={1}>
-            {/* {user?.firstName ?? "Passenger"}{" "}
-             */}
-            John <FontAwesome5 name="smile-beam" size={24} color="white" />
+            {user?.displayName ?? user?.firstName ?? "Passenger"}{" "}
+            <FontAwesome5 name="smile-beam" size={18} color="white" />
           </Text>
         </View>
         <TouchableOpacity
@@ -121,15 +113,14 @@ export default function HomeScreen({ navigation }) {
             placeholderTextColor={COLORS.textMuted}
             value={query}
             onChangeText={handleSearch}
-            onSubmitEditing={handleSearchSubmit}
             returnKeyType="search"
             accessibilityLabel="Search routes"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch("")}>
+            <TouchableOpacity onPress={handleClearSearch} style={styles.clearBtn}>
               <Ionicons
                 name="close-circle"
-                size={18}
+                size={20}
                 color={COLORS.textMuted}
               />
             </TouchableOpacity>
@@ -140,7 +131,7 @@ export default function HomeScreen({ navigation }) {
       {/* Section title */}
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>
-          {query ? `Results for "${query}"` : "All Routes"}
+          {query ? `Results for "${query}"` : "Available Routes"}
         </Text>
         <Text style={styles.count}>{filtered.length} routes</Text>
       </View>
@@ -160,7 +151,11 @@ export default function HomeScreen({ navigation }) {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => String(item.id ?? item.routeId)}
+          keyExtractor={(item, index) => {
+            // Ensure unique key by combining ID and index if necessary
+            const id = item.id ?? item.routeId;
+            return id ? `route-${id}` : `idx-${index}`;
+          }}
           renderItem={({ item }) => (
             <RouteCard
               route={item}
@@ -190,7 +185,7 @@ export default function HomeScreen({ navigation }) {
                   : "Routes will appear here once available."
               }
               actionLabel={query ? "Clear search" : undefined}
-              onAction={query ? () => handleSearch("") : undefined}
+              onAction={query ? handleClearSearch : undefined}
             />
           }
           contentContainerStyle={[
@@ -248,6 +243,9 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.md,
     color: COLORS.textPrimary,
     padding: 0,
+  },
+  clearBtn: {
+    padding: 2,
   },
   sectionRow: {
     flexDirection: "row",

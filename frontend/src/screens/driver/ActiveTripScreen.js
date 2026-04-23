@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, Alert,
+  View, Text, ScrollView, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,53 +27,30 @@ export default function ActiveTripScreen({ route: navRoute, navigation }) {
   }, [tripId]);
 
   async function handleDepart() {
-    Alert.alert(
-      'Confirm Departure',
-      'Mark this trip as departed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Depart',
-          onPress: async () => {
-            setDeparting(true);
-            try {
-              await driverApi.depart(tripId);
-              setTrip((prev) => ({ ...prev, status: 'DEPARTED' }));
-            } catch {
-              Alert.alert('Error', 'Could not mark departure. Try again.');
-            } finally {
-              setDeparting(false);
-            }
-          },
-        },
-      ],
-    );
+    setError(null);
+    setDeparting(true);
+    try {
+      await driverApi.depart(tripId);
+      setTrip((prev) => ({ ...prev, status: 'DEPARTED' }));
+    } catch {
+      setError("Could not mark departure. Try again.");
+    } finally {
+      setDeparting(false);
+    }
   }
 
   async function handleArrive() {
-    Alert.alert(
-      'Confirm Arrival',
-      'Mark this trip as arrived?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Arrive',
-          style: 'default',
-          onPress: async () => {
-            setArriving(true);
-            try {
-              await driverApi.arrive(tripId);
-              await driverApi.updateTripStatus(tripId, 'COMPLETED');
-              setTrip((prev) => ({ ...prev, status: 'COMPLETED' }));
-            } catch {
-              Alert.alert('Error', 'Could not mark arrival. Try again.');
-            } finally {
-              setArriving(false);
-            }
-          },
-        },
-      ],
-    );
+    setError(null);
+    setArriving(true);
+    try {
+      await driverApi.arrive(tripId);
+      await driverApi.updateTripStatus(tripId, 'COMPLETED');
+      setTrip((prev) => ({ ...prev, status: 'COMPLETED' }));
+    } catch {
+      setError("Could not mark arrival. Try again.");
+    } finally {
+      setArriving(false);
+    }
   }
 
   if (loading) return <LoadingSpinner fullScreen message="Loading trip…" />;

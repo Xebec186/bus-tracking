@@ -1,6 +1,11 @@
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE_URL, STORAGE_KEYS } from "../constants";
+import { API_BASE_URL } from "../constants";
+import {
+  forceLogout,
+  getAccessToken,
+  refreshAccessToken,
+  saveTokens,
+} from "./authSession";
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
@@ -11,10 +16,9 @@ const axiosClient = axios.create({
   },
 });
 
-// ─── Request interceptor: attach JWT ─────────────────────────────────────────
 axiosClient.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+    const token = await getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -23,26 +27,64 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ─── Response interceptor: handle 401 ────────────────────────────────────────
-// We keep a ref to the logout function set by AuthContext after mount.
-let _logoutCallback = null;
+let isRefreshing = false;
+let refreshQueue = [];
 
-export function setLogoutCallback(fn) {
-  _logoutCallback = fn;
+function resolveQueuedRequests(error, token = null) {
+  refreshQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  refreshQueue = [];
 }
 
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.TOKEN,
-        STORAGE_KEYS.USER,
-        STORAGE_KEYS.REFRESH_TOKEN,
-      ]);
-      if (_logoutCallback) _logoutCallback();
+    const originalRequest = error.config || {};
+    const status = error.response?.status;
+    const isAuthEndpoint =
+      typeof originalRequest.url === "string" &&
+      originalRequest.url.startsWith("/api/auth/");
+
+    if (status !== 401 || originalRequest._retry || isAuthEndpoint) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        refreshQueue.push({ resolve, reject });
+      }).then((token) => {
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return axiosClient(originalRequest);
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const tokenResponse = await refreshAccessToken();
+      const newToken = tokenResponse?.token || tokenResponse?.accessToken;
+      const newRefreshToken = tokenResponse?.refreshToken;
+      if (!newToken) {
+        throw new Error("Refresh response missing access token");
+      }
+
+      await saveTokens({ token: newToken, refreshToken: newRefreshToken });
+      resolveQueuedRequests(null, newToken);
+      originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      return axiosClient(originalRequest);
+    } catch (refreshError) {
+      resolveQueuedRequests(refreshError, null);
+      await forceLogout();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 

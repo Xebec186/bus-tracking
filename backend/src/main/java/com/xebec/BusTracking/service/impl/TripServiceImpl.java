@@ -2,9 +2,7 @@ package com.xebec.BusTracking.service.impl;
 
 import com.xebec.BusTracking.dto.TripDto;
 import com.xebec.BusTracking.exception.ResourceNotFoundException;
-import com.xebec.BusTracking.model.Schedule;
-import com.xebec.BusTracking.model.Trip;
-import com.xebec.BusTracking.model.TripStatus;
+import com.xebec.BusTracking.model.*;
 import com.xebec.BusTracking.repository.ScheduleRepository;
 import com.xebec.BusTracking.repository.TripRepository;
 import com.xebec.BusTracking.security.MyUserDetails;
@@ -18,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -27,6 +26,8 @@ public class TripServiceImpl implements TripService {
     private final TripRepository tripRepository;
     private final ScheduleRepository scheduleRepository;
     private final ModelMapper modelMapper;
+
+    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     @Override
     public TripDto createTrip(Long scheduleId) {
@@ -40,7 +41,7 @@ public class TripServiceImpl implements TripService {
         trip.setRevenue(0.0);
         trip.setStatus(TripStatus.ACTIVE);
 
-        return modelMapper.map(tripRepository.save(trip), TripDto.class);
+        return mapToDto(tripRepository.save(trip));
     }
 
     @Override
@@ -48,20 +49,20 @@ public class TripServiceImpl implements TripService {
     public TripDto getTripById(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Trip not found with given id: " + tripId));
-        return modelMapper.map(trip, TripDto.class);
+        return mapToDto(trip);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<TripDto> getAllTrips() {
-        return tripRepository.findAll().stream().map(trip -> modelMapper.map(trip, TripDto.class)).toList();
+        return tripRepository.findAll().stream().map(this::mapToDto).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<TripDto> getTripsBySchedule(Long scheduleId) {
         return tripRepository.findByScheduleId(scheduleId).stream()
-                .map(trip -> modelMapper.map(trip, TripDto.class))
+                .map(this::mapToDto)
                 .toList();
     }
 
@@ -69,7 +70,7 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public List<TripDto> getTripsByBus(Long busId) {
         return tripRepository.findByBusId(busId).stream()
-                .map(trip -> modelMapper.map(trip, TripDto.class))
+                .map(this::mapToDto)
                 .toList();
     }
 
@@ -77,7 +78,7 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public List<TripDto> getTripsByDriver(Long driverId) {
         return tripRepository.findByBusDriverId(driverId).stream()
-                .map(trip -> modelMapper.map(trip, TripDto.class))
+                .map(this::mapToDto)
                 .toList();
     }
 
@@ -89,7 +90,7 @@ public class TripServiceImpl implements TripService {
         assertCurrentDriverCanModifyTrip(trip);
 
         trip.setStatus(status);
-        return modelMapper.map(tripRepository.save(trip), TripDto.class);
+        return mapToDto(tripRepository.save(trip));
     }
 
     @Override
@@ -101,7 +102,7 @@ public class TripServiceImpl implements TripService {
 
         trip.setActualDepartureTime(actualDeparture);
         trip.setStatus(TripStatus.ACTIVE);
-        return modelMapper.map(tripRepository.save(trip), TripDto.class);
+        return mapToDto(tripRepository.save(trip));
     }
 
     @Override
@@ -113,14 +114,24 @@ public class TripServiceImpl implements TripService {
 
         trip.setActualArrivalTime(actualArrival);
         trip.setStatus(TripStatus.COMPLETED);
-        return modelMapper.map(tripRepository.save(trip), TripDto.class);
+        return mapToDto(tripRepository.save(trip));
+    }
+
+    @Override
+    public TripDto systemRecordArrival(Long tripId, LocalDateTime actualArrival) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip not found with given id: " + tripId));
+
+        trip.setActualArrivalTime(actualArrival);
+        trip.setStatus(TripStatus.COMPLETED);
+        return mapToDto(tripRepository.save(trip));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<TripDto> getTripsByDateRange(LocalDateTime start, LocalDateTime end) {
         return tripRepository.findByActualDepartureTimeBetween(start, end).stream()
-                .map(trip -> modelMapper.map(trip, TripDto.class))
+                .map(this::mapToDto)
                 .toList();
     }
 
@@ -128,6 +139,35 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public long completedTripCount() {
         return tripRepository.countByStatus(TripStatus.COMPLETED);
+    }
+
+    private TripDto mapToDto(Trip trip) {
+        TripDto dto = modelMapper.map(trip, TripDto.class);
+        
+        if (trip.getSchedule() != null) {
+            Route route = trip.getSchedule().getRoute();
+            if (route != null) {
+                dto.setRouteName(route.getName() + " (" + route.getNumber() + ")");
+                
+                // Set origin and destination from route stops if available
+                if (route.getRouteStops() != null && !route.getRouteStops().isEmpty()) {
+                    List<RouteStop> stops = route.getRouteStops();
+                    dto.setOrigin(stops.get(0).getStop().getName());
+                    dto.setDestination(stops.get(stops.size() - 1).getStop().getName());
+                }
+            }
+            
+            // Set scheduled times from schedule days if today
+            if (trip.getSchedule().getScheduleDays() != null && !trip.getSchedule().getScheduleDays().isEmpty()) {
+                ScheduleDay day = trip.getSchedule().getScheduleDays().get(0); // Take first as representative
+                dto.setScheduledDeparture(day.getDepartureTime().format(timeFormatter));
+                dto.setScheduledArrival(day.getArrivalTime().format(timeFormatter));
+            }
+        }
+        
+        dto.setPassengerCount(trip.getTicketsSold() != null ? trip.getTicketsSold() : 0);
+        
+        return dto;
     }
 
     private void assertCurrentDriverCanModifyTrip(Trip trip) {

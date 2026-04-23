@@ -8,6 +8,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -18,6 +19,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -29,10 +36,24 @@ public class SecurityConfig {
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
+        configuration.setExposedHeaders(List.of("x-auth-token"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     @Order(1)
-    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .securityMatcher("/api/**")
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/api/auth/**").permitAll()
                         // Public tracking read access
@@ -43,6 +64,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/trips/*/status").hasAuthority("DRIVER")
                         .requestMatchers(HttpMethod.POST, "/api/trips/*/depart").hasAuthority("DRIVER")
                         .requestMatchers(HttpMethod.POST, "/api/trips/*/arrive").hasAuthority("DRIVER")
+                        .requestMatchers(HttpMethod.GET, "/api/trips/driver/*").hasAuthority("DRIVER")
+                        .requestMatchers(HttpMethod.POST, "/api/driver/tickets/*/validate").hasAuthority("DRIVER")
                         // Passenger actions
                         .requestMatchers("/api/passenger/**").hasAuthority("PASSENGER")
                         // Admin actions
@@ -77,7 +100,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .securityMatcher("/**")
                 .authorizeHttpRequests(requests -> requests
@@ -88,11 +111,12 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/dashboard",
                                 "/buses",
-                                "/routes",
-                                "/stops",
-                                "/schedules",
-                                "/tickets",
-                                "/tracking"
+                                "/routes/**",
+                                "/stops/**",
+                                "/schedules/**",
+                                "/tickets/**",
+                                "/tracking/**",
+                                "/reports/**"
                         ).hasAuthority("ADMIN")
                         .requestMatchers("/users/**").hasAuthority("ADMIN")
                         .anyRequest()

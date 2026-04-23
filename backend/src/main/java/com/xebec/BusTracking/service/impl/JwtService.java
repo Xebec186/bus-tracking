@@ -62,7 +62,8 @@ public class JwtService {
                 "firstName", user.getFirstName(),
                 "lastName", user.getLastName(),
                 "role", user.getRole().name(),
-                "userId", user.getId()
+                "userId", user.getId(),
+                "phoneNumber", user.getPhoneNumber()
         ));
         return Jwts.builder()
                 .claims()

@@ -52,6 +52,14 @@ public class RouteServiceImpl implements RouteService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<RouteDto> getActiveRoutes() {
+        return routeRepository.findAllWithActiveSchedules().stream()
+                .map(route -> enrich(modelMapper.map(route, RouteDto.class)))
+                .toList();
+    }
+
     private RouteDto enrich(RouteDto dto) {
         if (dto == null || dto.getId() == null) return dto;
         List<RouteStop> stops = routeStopRepository.findByRouteIdOrderByStopSequence(dto.getId());
@@ -95,6 +103,12 @@ public class RouteServiceImpl implements RouteService {
                 .filter(route -> routeContainsStops(route.getId(), normalizedOrigin, normalizedDestination))
                 .map(route -> enrich(modelMapper.map(route, RouteDto.class)))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long routeCount() {
+        return routeRepository.count();
     }
 
     private boolean routeContainsStops(Long routeId, String origin, String destination) {

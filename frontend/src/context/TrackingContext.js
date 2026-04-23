@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { createStompClient, subscribeToLocations } from '../services/websocketService';
-import { MOCK_BUS_LOCATIONS } from '../api/mockData';
 
 const TrackingContext = createContext(null);
-const USE_MOCK_WS = true;
+const USE_MOCK_WS = false;
 
 export function TrackingProvider({ children }) {
   // busLocations: Map keyed by busId → { busId, latitude, longitude, routeId, timestamp, ... }
@@ -15,7 +14,7 @@ export function TrackingProvider({ children }) {
   const subscriptionRef = useRef(null);
   const mockTimerRef    = useRef(null);
 
-  // ── Mock Simulation ───────────────────────────────────────────────────────
+  // ── Mock Simulation (kept for explicit local demo toggles) ───────────────
   const startMockSimulation = useCallback(() => {
     setWsConnected(true);
     // Initial seed
@@ -58,8 +57,28 @@ export function TrackingProvider({ children }) {
 
         // Subscribe to location broadcasts
         subscriptionRef.current = subscribeToLocations(client, (payload) => {
-          // Payload may be a single location object or an array
-          const locations = Array.isArray(payload) ? payload : [payload];
+          // Payload can be:
+          // 1) a single location object
+          // 2) an array of location objects
+          // 3) { activeBuses: [...] } from backend realtime payload
+          const source = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.activeBuses)
+              ? payload.activeBuses
+              : [payload];
+          const locations = source
+            .map((loc) => ({
+              ...loc,
+              busId: loc?.busId ?? loc?.id ?? loc?.registrationNumber,
+              latitude: Number(loc?.latitude ?? loc?.lat),
+              longitude: Number(loc?.longitude ?? loc?.lng),
+            }))
+            .filter(
+              (loc) =>
+                loc?.busId != null &&
+                Number.isFinite(loc.latitude) &&
+                Number.isFinite(loc.longitude),
+            );
           setBusLocations((prev) => {
             const next = { ...prev };
             locations.forEach((loc) => {
@@ -103,7 +122,12 @@ export function TrackingProvider({ children }) {
     if (!Array.isArray(buses)) return;
     const map = {};
     buses.forEach((b) => {
-      if (b?.busId != null) map[b.busId] = b;
+      const busId = b?.busId ?? b?.id ?? b?.registrationNumber;
+      const latitude = Number(b?.latitude ?? b?.lat);
+      const longitude = Number(b?.longitude ?? b?.lng);
+      if (busId != null && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        map[busId] = { ...b, busId, latitude, longitude };
+      }
     });
     setBusLocations(map);
   }, []);

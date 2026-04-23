@@ -25,6 +25,8 @@ public interface TripService {
 
     TripDto recordArrival(Long tripId, LocalDateTime actualArrival);
 
+    TripDto systemRecordArrival(Long tripId, LocalDateTime actualArrival);
+
     List<TripDto> getTripsByDateRange(LocalDateTime start, LocalDateTime end);
 
     long completedTripCount();

@@ -21,4 +21,12 @@ public class TripDto {
     private TripStatus status;
     private LocalDateTime actualDepartureTime;
     private LocalDateTime actualArrivalTime;
+
+    // --- Enhanced fields for Mobile UI ---
+    private String routeName;
+    private String origin;
+    private String destination;
+    private String scheduledDeparture;
+    private String scheduledArrival;
+    private Integer passengerCount;
 }

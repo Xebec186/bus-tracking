@@ -10,20 +10,53 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
+import { passengerApi } from "../../api/passengerApi";
+import AppInput from "../../components/common/AppInput";
+import AppButton from "../../components/common/AppButton";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
 
 export default function PassengerProfileScreen() {
   const { user, logout } = useAuth();
+  
+  // Change password state
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
-  function confirmLogout() {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign Out", style: "destructive", onPress: logout },
-      ]
-    );
+  async function handleChangePassword() {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Error", "Please fill in all password fields.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      Alert.alert("Error", "New password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await passengerApi.changePassword({
+        oldPassword,
+        newPassword,
+        confirmPassword,
+      });
+      Alert.alert("Success", "Password changed successfully.");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordSection(false);
+    } catch (err) {
+      const msg = err.response?.data?.message ?? "Failed to change password.";
+      Alert.alert("Error", msg);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -78,42 +111,78 @@ export default function PassengerProfileScreen() {
             />
             <Divider />
             <InfoRow
-              icon="finger-print-outline"
-              label="User ID"
-              value={user?.userId ? `#${user.userId}` : "—"}
+              icon="call-outline"
+              label="Phone"
+              value={user?.phoneNumber ?? "—"}
             />
           </View>
         </View>
 
-        {/* App info */}
+        {/* Change Password Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App</Text>
-          <View style={styles.infoCard}>
-            <InfoRow
-              icon="bus-outline"
-              label="Application"
-              value="SmartBus Accra"
+          <TouchableOpacity 
+            style={styles.sectionHeaderRow}
+            onPress={() => setShowPasswordSection(!showPasswordSection)}
+          >
+            <Text style={styles.sectionTitle}>Security</Text>
+            <Ionicons 
+              name={showPasswordSection ? "chevron-up" : "chevron-down"} 
+              size={18} 
+              color={COLORS.textSecondary} 
             />
-            <Divider />
-            <InfoRow
-              icon="information-circle-outline"
-              label="Version"
-              value="1.0.0"
-            />
-            <Divider />
-            <InfoRow
-              icon="school-outline"
-              label="Institution"
-              value="University of the West of Scotland"
-            />
-          </View>
+          </TouchableOpacity>
+          
+          {showPasswordSection ? (
+            <View style={styles.passwordCard}>
+              <AppInput
+                label="Current Password"
+                placeholder="••••••••"
+                secureTextEntry
+                value={oldPassword}
+                onChangeText={setOldPassword}
+              />
+              <AppInput
+                label="New Password"
+                placeholder="••••••••"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+              <AppInput
+                label="Confirm New Password"
+                placeholder="••••••••"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+              <AppButton
+                label="Update Password"
+                onPress={handleChangePassword}
+                loading={loading}
+                style={styles.updateBtn}
+              />
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.infoCard} 
+              onPress={() => setShowPasswordSection(true)}
+            >
+              <View style={styles.infoRow}>
+                <View style={styles.infoLeft}>
+                  <Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />
+                  <Text style={styles.infoLabel}>Change Password</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Sign out */}
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.signOutBtn}
-            onPress={confirmLogout}
+            onPress={logout}
             activeOpacity={0.82}
             accessibilityRole="button"
             accessibilityLabel="Sign out"
@@ -219,6 +288,13 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.md,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.sm,
+    paddingRight: SPACING.xs,
+  },
   sectionTitle: {
     fontSize: FONTS.sizes.sm,
     fontWeight: "700",
@@ -262,6 +338,16 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.divider,
     marginLeft: SPACING.md + 18 + SPACING.sm,
+  },
+
+  passwordCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    ...SHADOW.sm,
+  },
+  updateBtn: {
+    marginTop: SPACING.sm,
   },
 
   signOutBtn: {

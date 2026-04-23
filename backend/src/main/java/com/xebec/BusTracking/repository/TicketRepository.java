@@ -17,6 +17,14 @@ import java.util.Optional;
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
     Optional<Ticket> findByCode(String code);
 
+    @Query("""
+    SELECT t FROM Ticket t
+    JOIN FETCH t.schedule s
+    JOIN FETCH s.route
+    JOIN FETCH t.originStop
+    JOIN FETCH t.destinationStop
+    WHERE t.passenger.id = :passengerId
+    """)
     List<Ticket> findByPassengerId(Long passengerId);
 
     List<Ticket> findByScheduleId(Long scheduleId);

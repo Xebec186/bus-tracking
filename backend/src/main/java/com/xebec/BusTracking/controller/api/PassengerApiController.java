@@ -43,6 +43,11 @@ public class PassengerApiController {
         return routeService.getAllRoutes();
     }
 
+    @GetMapping("/routes/active")
+    public List<RouteDto> activeRoutes() {
+        return routeService.getActiveRoutes();
+    }
+
     @GetMapping("/routes/{routeId}")
     public RouteDto route(@PathVariable Long routeId) {
         return routeService.getRouteById(routeId);
@@ -64,7 +69,7 @@ public class PassengerApiController {
     }
 
     @GetMapping("/routes/{routeId}/schedules")
-    public List<ScheduleResponse> getSchedulesByRouteId(Long routeId) {
+    public List<ScheduleResponse> getSchedulesByRouteId(@PathVariable Long routeId) {
         return scheduleService.getSchedulesByRouteId(routeId);
     }
 
@@ -94,8 +99,14 @@ public class PassengerApiController {
     }
 
     @GetMapping("/tickets/{ticketId}")
-    public TicketDto ticket(@PathVariable Long ticketId) {
-        return ticketService.getTicket(ticketId);
+    public TicketDto ticket(@PathVariable Long ticketId,
+                            @AuthenticationPrincipal MyUserDetails principal) {
+        TicketDto ticket = ticketService.getTicket(ticketId);
+        Long userId = currentUserId(principal);
+        if (ticket.getPassengerId() == null || !ticket.getPassengerId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You are not allowed to access this ticket");
+        }
+        return ticket;
     }
 
     @PostMapping("/tickets/{ticketId}/pay")

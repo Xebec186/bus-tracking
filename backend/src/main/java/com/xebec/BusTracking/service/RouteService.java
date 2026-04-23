@@ -10,10 +10,14 @@ public interface RouteService {
     RouteDto getRouteById(Long routeId);
 
     List<RouteDto> getAllRoutes();
+    
+    List<RouteDto> getActiveRoutes();
 
     RouteDto updateRoute(Long routeId, RouteDto routeDto);
 
     void deleteRoute(Long routeId);
 
     List<RouteDto> findByOriginAndDestination(String origin, String destination);
+
+    long routeCount();
 }

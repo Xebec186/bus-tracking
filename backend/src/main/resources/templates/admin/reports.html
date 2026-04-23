@@ -143,10 +143,10 @@
         <div class="detail-header">
             <h5>Detailed Report Data</h5>
             <div class="export-btns">
-                <a th:href="@{/reports/export/csv}" class="btn-export-csv">
+                <a th:href="@{/reports/export/csv(startDate=${startDate},endDate=${endDate},routeId=${selectedRouteId},busId=${selectedBusId},reportType=${reportType})}" class="btn-export-csv">
                     <i class="bi bi-file-earmark-text"></i> Export CSV
                 </a>
-                <a th:href="@{/reports/export/pdf}" class="btn-export-pdf">
+                <a th:href="@{/reports/export/pdf(startDate=${startDate},endDate=${endDate},routeId=${selectedRouteId},busId=${selectedBusId},reportType=${reportType})}" class="btn-export-pdf">
                     <i class="bi bi-download"></i> Export PDF
                 </a>
             </div>

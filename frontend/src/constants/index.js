@@ -104,9 +104,16 @@ export const SHADOW = {
 };
 
 // ─── Backend ──────────────────────────────────────────────────────────────────
-// Replace with your actual Spring Boot host when running on device
-export const API_BASE_URL = "http://192.168.100.3:8080"; // Android emulator → localhost
-export const WS_BASE_URL = "http://192.168.100.3:8080/ws"; // SockJS endpoint
+/**
+ * Note on connection:
+ * - http://localhost:8080 or http://127.0.0.1:8080: Only for web/iOS simulator
+ * - http://10.0.2.2:8080: Default bridge for Android emulator
+ * - http://192.168.x.x:8080: Your local IP (use this for physical devices & iOS sim)
+ */
+const DEFAULT_API_BASE_URL = "http://192.168.100.3:8080";
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+export const WS_BASE_URL = `${API_BASE_URL}/ws`;
 
 // ─── AsyncStorage keys ────────────────────────────────────────────────────────
 export const STORAGE_KEYS = {

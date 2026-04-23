@@ -1,10 +1,12 @@
 package com.xebec.BusTracking.service;
 
 import com.xebec.BusTracking.dto.PagedResult;
+import com.xebec.BusTracking.dto.TokenResponse;
 import com.xebec.BusTracking.dto.user.*;
 import com.xebec.BusTracking.model.User;
 
 public interface UserService {
+    public TokenResponse login(LoginDto loginDto);
     public User signup(SignupDto signupDto);
 
     /** Paginated, filtered user list for the admin table */

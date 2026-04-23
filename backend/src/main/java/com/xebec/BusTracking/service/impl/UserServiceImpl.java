@@ -1,6 +1,7 @@
 package com.xebec.BusTracking.service.impl;
 
 import com.xebec.BusTracking.dto.PagedResult;
+import com.xebec.BusTracking.dto.TokenResponse;
 import com.xebec.BusTracking.dto.user.*;
 import com.xebec.BusTracking.exception.*;
 import com.xebec.BusTracking.model.User;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,31 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+
+    // ── LOGIN METHOD ────────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    public TokenResponse login(LoginDto loginDto) {
+        User user = userRepository.findByEmail(loginDto.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Invalid email or password"));
+
+        if (!passwordEncoder.matches(loginDto.getPassword(), user.getPasswordHash())) {
+            throw new ResourceNotFoundException("Invalid email or password");
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("User account is " + user.getStatus().label());
+        }
+
+        user.setLastLoginAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
+
+        String token = jwtService.generateToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        return new TokenResponse(token, refreshToken);
+    }
 
     // ── SIGNUP METHOD FOR REST API ────────────────────────────────────────────────────────────
     @Override
@@ -47,6 +74,19 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         return userRepository.save(user);
+    }
+
+    private UserDto toDto(User u) {
+        return UserDto.builder()
+                .id(u.getId())
+                .firstName(u.getFirstName())
+                .lastName(u.getLastName())
+                .email(u.getEmail())
+                .phoneNumber(u.getPhoneNumber())
+                .role(u.getRole())
+                .status(u.getStatus())
+                .createdAt(u.getCreatedAt())
+                .build();
     }
 
     // ── LIST ────────────────────────────────────────────────────────────

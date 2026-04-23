@@ -36,6 +36,11 @@ public class TripApiController {
         return tripService.getTripsByBus(busId);
     }
 
+    @GetMapping("/driver/{driverId}")
+    public List<TripDto> tripsByDriver(@PathVariable Long driverId) {
+        return tripService.getTripsByDriver(driverId);
+    }
+
     @PutMapping("/{tripId}/status")
     public TripDto updateStatus(@PathVariable Long tripId, @Valid @RequestBody TripStatusUpdateRequest request) {
         return tripService.updateTripStatus(tripId, request.getStatus());

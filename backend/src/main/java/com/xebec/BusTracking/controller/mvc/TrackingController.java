@@ -7,12 +7,13 @@ import com.xebec.BusTracking.repository.BusLocationRepository;
 import com.xebec.BusTracking.repository.BusRepository;
 import com.xebec.BusTracking.repository.RouteRepository;
 import com.xebec.BusTracking.repository.TripRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -22,6 +23,7 @@ import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
+@Slf4j
 public class TrackingController {
 
     private final BusRepository busRepository;
@@ -42,7 +44,7 @@ public class TrackingController {
         long inMaintenance = buses.stream().filter(b -> b.getStatus() == BusStatus.MAINTENANCE).count();
 
         for (Bus bus : buses) {
-            if (bus.getStatus() == BusStatus.MAINTENANCE) continue; // skip before location lookup
+            if (bus.getStatus() == BusStatus.MAINTENANCE) continue; 
             BusLocation latest = busLocationRepository.findTopByBusIdOrderByTimestampDesc(bus.getId()).orElse(null);
             if (latest == null || latest.getTimestamp() == null) continue;
 
@@ -53,11 +55,10 @@ public class TrackingController {
                     ? TrackingBusDto.TrackingStatus.MOVING
                     : TrackingBusDto.TrackingStatus.STOPPED;
 
-            // Find current route from active trip
             String currentRouteName = null;
             List<Trip> activeTrips = tripRepository.findByBusIdAndStatusWithScheduleAndRoute(bus.getId(), TripStatus.ACTIVE);
             if (!activeTrips.isEmpty()) {
-                Trip currentTrip = activeTrips.get(0); // Take the first active trip
+                Trip currentTrip = activeTrips.get(0);
                 currentRouteName = currentTrip.getSchedule().getRoute().getName();
             }
 
@@ -94,11 +95,11 @@ public class TrackingController {
 
         try {
             model.addAttribute("busLocationsJson", objectMapper.writeValueAsString(mapPoints));
-        } catch (JacksonException e) {
+        } catch (JsonProcessingException e) {
+            log.error("Error serializing bus locations", e);
             model.addAttribute("busLocationsJson", "[]");
         }
 
-        // Add route data for visualization
         List<Route> routes = routeRepository.findAllWithStops();
         List<Object> routeData = new ArrayList<>();
         for (Route route : routes) {
@@ -121,8 +122,9 @@ public class TrackingController {
         }
 
         try {
-            model.addAttribute("routesJson", routeData);
-        } catch (JacksonException e) {
+            model.addAttribute("routesJson", objectMapper.writeValueAsString(routeData));
+        } catch (JsonProcessingException e) {
+            log.error("Error serializing route data", e);
             model.addAttribute("routesJson", "[]");
         }
 
@@ -131,7 +133,7 @@ public class TrackingController {
 
     private String formatLastUpdated(LocalDateTime timestamp) {
         if (timestamp == null) return "never";
-        Duration duration = Duration.between(timestamp, LocalDateTime.now()).abs(); // add .abs()
+        Duration duration = Duration.between(timestamp, LocalDateTime.now()).abs();
         long minutes = duration.toMinutes();
         if (minutes < 1) return "just now";
         if (minutes < 60) return minutes + " min ago";

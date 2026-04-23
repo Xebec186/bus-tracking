@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { passengerApi } from "../../api/passengerApi";
+import { driverApi } from "../../api/driverApi";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
 
 // Validation result states
@@ -78,7 +78,7 @@ export default function TicketValidationScreen({ navigation }) {
     setError(null);
 
     try {
-      const res = await passengerApi.validateTicket(trimmed);
+      const res = await driverApi.validateTicket(trimmed);
       const data = res.data;
 
       // Backend may return { valid: true/false, ticket: {...}, message: "..." }
@@ -86,7 +86,7 @@ export default function TicketValidationScreen({ navigation }) {
       const isValid =
         data?.valid !== undefined
           ? data.valid
-          : data?.status === "PAID" || data?.status === "BOOKED";
+          : data?.status === "PAID" || data?.status === "BOOKED" || data?.status === "USED";
 
       if (isValid) {
         setResult(data?.ticket ?? data);

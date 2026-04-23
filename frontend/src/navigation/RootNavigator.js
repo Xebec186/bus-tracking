@@ -1,4 +1,4 @@
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
@@ -11,7 +11,6 @@ import { COLORS } from "../constants";
 
 const Stack = createNativeStackNavigator();
 
-// ── Auth stack (unauthenticated) ──────────────────────────────────────────────
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade" }}>
@@ -21,7 +20,6 @@ function AuthStack() {
   );
 }
 
-// ── Splash guard while token is being restored from AsyncStorage ──────────────
 function SplashScreen() {
   return (
     <View style={styles.splash}>
@@ -30,23 +28,29 @@ function SplashScreen() {
   );
 }
 
-// ── Root navigator ────────────────────────────────────────────────────────────
 export default function RootNavigator() {
-  const { isAuthenticated, isPassenger, isDriver, loading } = useAuth();
+  const { isAuthenticated, isPassenger, isDriver, user, logout, loading } = useAuth();
 
   if (loading) return <SplashScreen />;
 
   return (
     <NavigationContainer>
       {!isAuthenticated ? (
-        // Not logged in → show auth stack
         <AuthStack />
       ) : isDriver ? (
-        // Logged in as DRIVER → driver stack
         <DriverStackNavigator />
-      ) : (
-        // Logged in as PASSENGER (or any other role) → passenger tabs
+      ) : isPassenger ? (
         <PassengerTabNavigator />
+      ) : (
+        <View style={styles.splash}>
+          <Text style={styles.unsupportedTitle}>Unsupported Role</Text>
+          <Text style={styles.unsupportedText}>
+            Role `{user?.role ?? "UNKNOWN"}` is not available in this mobile app.
+          </Text>
+          <TouchableOpacity onPress={logout} style={styles.unsupportedButton}>
+            <Text style={styles.unsupportedButtonText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </NavigationContainer>
   );
@@ -58,5 +62,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 20,
   },
+  unsupportedTitle: { fontSize: 20, fontWeight: "700", color: COLORS.textPrimary },
+  unsupportedText: { marginTop: 8, color: COLORS.textSecondary, textAlign: "center" },
+  unsupportedButton: {
+    marginTop: 16,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  unsupportedButtonText: { color: COLORS.white, fontWeight: "700" },
 });
+

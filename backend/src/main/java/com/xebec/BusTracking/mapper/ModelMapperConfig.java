@@ -56,6 +56,9 @@ public class ModelMapperConfig {
                     mapper.map(src -> src.getPassenger().getId(), TicketDto::setPassengerId);
                     mapper.map(src -> src.getOriginStop().getId(), TicketDto::setOriginStopId);
                     mapper.map(src -> src.getDestinationStop().getId(), TicketDto::setDestinationStopId);
+                    mapper.map(src -> src.getOriginStop().getName(), TicketDto::setOrigin);
+                    mapper.map(src -> src.getDestinationStop().getName(), TicketDto::setDestination);
+                    mapper.map(src -> src.getSchedule().getRoute().getName(), TicketDto::setRouteName);
                 });
 
         // ---------------------------

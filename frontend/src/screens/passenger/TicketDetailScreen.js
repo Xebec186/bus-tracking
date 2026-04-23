@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { passengerApi } from "../../api/passengerApi";
+import { unwrapApiData } from "../../api/responseUtils";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { ErrorBanner } from "../../components/common/EmptyState";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
@@ -29,7 +30,7 @@ export default function TicketDetailScreen({ route: navRoute, navigation }) {
   useEffect(() => {
     passengerApi
       .getTicket(ticketId)
-      .then((res) => setTicket(res.data))
+      .then((res) => setTicket(unwrapApiData(res)))
       .catch(() => setError("Could not load ticket details."))
       .finally(() => setLoading(false));
   }, [ticketId]);
@@ -113,26 +114,19 @@ export default function TicketDetailScreen({ route: navRoute, navigation }) {
                 label="Date"
                 value={ticket.travelDate ?? ticket.date ?? "—"}
               />
-              <MetaCell label="Departure" value={ticket.departureTime ?? "—"} />
+              <MetaCell label="Boarding" value={ticket.boardingTime ?? "—"} />
+              <MetaCell label="Amount" value={`GH₵ ${ticket.price ?? "—"}`} />
               <MetaCell
-                label="Passengers"
-                value={String(ticket.passengers ?? 1)}
+                label="Payment Method"
+                value={ticket.paymentMethod ?? "—"}
               />
               <MetaCell
-                label="Fare type"
-                value={ticket.fareType ?? "Standard"}
+                label="Payment Reference"
+                value={ticket.paymentReference ?? "—"}
               />
-              <MetaCell
-                label="Amount"
-                value={`GH₵ ${ticket.amount ?? ticket.fare ?? "—"}`}
-              />
-              <MetaCell
-                label="Ticket #"
-                value={ticket.ticketCode ?? `#${ticket.id}`}
-              />
+              <MetaCell label="Ticket #" value={ticket.code ?? "-"} />
             </View>
 
-            {/* QR placeholder (Phase 2: replace with real QR library) */}
             <View style={styles.qrSection}>
               <View style={styles.qrBox}>
                 <Ionicons
@@ -142,11 +136,7 @@ export default function TicketDetailScreen({ route: navRoute, navigation }) {
                 />
               </View>
               <Text style={styles.qrLabel}>Ticket Code</Text>
-              <Text style={styles.qrCode}>
-                {ticket.ticketCode ??
-                  ticket.validationCode ??
-                  `SB-${ticket.id}`}
-              </Text>
+              <Text style={styles.qrCode}>{ticket.code ?? "-"}</Text>
               <Text style={styles.qrHint}>
                 Show this to the driver to board
               </Text>
@@ -179,7 +169,7 @@ function MetaCell({ label, value }) {
   return (
     <View style={styles.metaCell}>
       <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue} numberOfLines={1}>
+      <Text style={styles.metaValue} numberOfLines={2}>
         {value}
       </Text>
     </View>

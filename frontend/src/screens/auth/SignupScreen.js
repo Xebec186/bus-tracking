@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,7 +20,7 @@ import { COLORS, FONTS, SPACING, RADIUS } from "../../constants";
 export default function SignupScreen({ navigation }) {
   const { login } = useAuth();
 
-  // Form fields — split to match SignupDto exactly
+  // Form fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,44 +31,52 @@ export default function SignupScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  // ── Keyboard Listeners ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // ── Client-side validation ─────────────────────────────────────────────────
-  // Rules mirror SignupDto constraints so the user gets instant feedback
-  // before the request is ever sent.
   function validate() {
     const e = {};
 
-    // firstName — @NotBlank, @Size(max=100)
     if (!firstName.trim()) e.firstName = "First name is required";
     else if (firstName.trim().length > 100)
       e.firstName = "First name cannot exceed 100 characters";
 
-    // lastName — @NotBlank, @Size(max=100)
     if (!lastName.trim()) e.lastName = "Last name is required";
     else if (lastName.trim().length > 100)
       e.lastName = "Last name cannot exceed 100 characters";
 
-    // email — @NotBlank, @Email, @Size(max=150)
     if (!email.trim()) e.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(email))
       e.email = "Please enter a valid email address";
     else if (email.length > 150) e.email = "Email cannot exceed 150 characters";
 
-    // phoneNumber — optional but @Pattern(^[0-9]{10}$) if provided
     if (phoneNumber.trim() && !/^[0-9]{10}$/.test(phoneNumber.trim()))
       e.phoneNumber = "Phone number must be exactly 10 digits";
 
-    // password — @NotBlank, @Size(min=8, max=72), @Pattern (upper+lower+digit)
     if (!password) e.password = "Password is required";
     else if (password.length < 8)
-      e.password = "Password must be between 8 and 72 characters";
+      e.password = "Password must be at least 8 characters";
     else if (password.length > 72)
       e.password = "Password must be between 8 and 72 characters";
     else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password))
       e.password =
         "Password must contain at least one uppercase letter, one lowercase letter, and one digit";
 
-    // confirmPassword — @NotBlank, must match password
     if (!confirm) e.confirm = "Please confirm the password";
     else if (confirm !== password) e.confirm = "Passwords do not match";
 
@@ -75,7 +84,6 @@ export default function SignupScreen({ navigation }) {
     return Object.keys(e).length === 0;
   }
 
-  // Clear a single field's error the moment the user starts editing it
   function clearFieldError(field) {
     setErrors((prev) => {
       if (!prev[field]) return prev;
@@ -86,13 +94,9 @@ export default function SignupScreen({ navigation }) {
     setServerError(null);
   }
 
-  // Route backend error response:
-  // { message, errors: { firstName, lastName, email, ... }, status }
   function handleApiError(err) {
     const data = err.response?.data;
     if (data?.errors && Object.keys(data.errors).length > 0) {
-      // Backend uses "confirmPassword" as the field key; our local state key
-      // is "confirm" — map it across so AppInput renders it correctly.
       const mapped = { ...data.errors };
       if (mapped.confirmPassword) {
         mapped.confirm = mapped.confirmPassword;
@@ -129,32 +133,33 @@ export default function SignupScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={isKeyboardVisible}
+          scrollEnabled={true} // Re-enabled to allow full visibility of long form
         >
-          {/* Header */}
+          {/* Compact Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back" size={22} color={COLORS.white} />
+              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
-            <View style={styles.logoWrap}>
-              <Ionicons name="person-add" size={32} color={COLORS.white} />
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.appName}>Create Account</Text>
+              <Text style={styles.tagline}>SmartBus Accra</Text>
             </View>
-            <Text style={styles.appName}>Create Account</Text>
-            <Text style={styles.tagline}>Join SmartBus</Text>
           </View>
 
           {/* Card */}
           <View style={styles.card}>
-            {/* General server error (email already registered, etc.) */}
             {serverError ? (
               <View style={styles.serverErrorBox}>
                 <Ionicons
@@ -166,7 +171,7 @@ export default function SignupScreen({ navigation }) {
               </View>
             ) : null}
 
-            {/* Name row — side by side */}
+            {/* Name row */}
             <View style={styles.nameRow}>
               <View style={styles.nameField}>
                 <AppInput
@@ -238,10 +243,9 @@ export default function SignupScreen({ navigation }) {
               error={errors.password}
             />
 
-            {/* Password hint — always visible to set expectations upfront */}
             {!errors.password ? (
               <Text style={styles.passwordHint}>
-                Min 8 characters · uppercase · lowercase · number
+                Min 8 chars · uppercase · lowercase · number
               </Text>
             ) : null}
 
@@ -276,6 +280,8 @@ export default function SignupScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           </View>
+          
+          <View style={{ height: SPACING.xl }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -284,41 +290,49 @@ export default function SignupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.primary },
-  scroll: { flexGrow: 1, paddingBottom: SPACING.xl },
+  scroll: { 
+    flexGrow: 1,
+    paddingBottom: SPACING.xl 
+  },
   header: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xl,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.md,
   },
   backBtn: {
-    alignSelf: "flex-start",
-    marginLeft: SPACING.md,
     padding: SPACING.xs,
+    marginRight: SPACING.sm,
   },
-  logoWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: SPACING.sm,
+  headerTextWrap: {
+    flex: 1,
   },
   appName: {
-    fontSize: FONTS.sizes.xxl,
+    fontSize: FONTS.sizes.h2,
     fontWeight: "800",
     color: COLORS.white,
   },
   tagline: {
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs,
     color: "rgba(255,255,255,0.75)",
-    marginTop: SPACING.xs,
   },
   card: {
     backgroundColor: COLORS.white,
     marginHorizontal: SPACING.md,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   serverErrorBox: {
     flexDirection: "row",

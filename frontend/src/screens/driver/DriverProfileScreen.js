@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,17 +13,6 @@ import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
 
 export default function DriverProfileScreen() {
   const { user, logout } = useAuth();
-
-  function confirmLogout() {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Sign Out", style: "destructive", onPress: logout },
-      ]
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -141,7 +129,7 @@ export default function DriverProfileScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.signOutBtn}
-            onPress={confirmLogout}
+            onPress={logout}
             activeOpacity={0.82}
             accessibilityRole="button"
             accessibilityLabel="Sign out"

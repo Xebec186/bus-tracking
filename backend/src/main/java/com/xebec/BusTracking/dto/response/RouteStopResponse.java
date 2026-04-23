@@ -29,7 +29,7 @@ public class RouteStopResponse {
         return RouteStopResponse.builder()
                 .id(routeStop.getId())
                 .stopId(stop.getId())
-                .routeId(stop.getId())
+                .routeId(routeStop.getRoute() != null ? routeStop.getRoute().getId() : null)
                 .name(stop.getName())
                 .latitude(stop.getLatitude())
                 .longitude(stop.getLongitude())

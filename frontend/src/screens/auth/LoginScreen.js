@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,9 +24,24 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  // ── Keyboard Listeners ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // ── Client-side validation ─────────────────────────────────────────────────
-  // Password minimum matches backend @Size(min = 8)
   function validate() {
     const e = {};
     if (!email.trim()) e.email = "Email is required";
@@ -37,7 +53,6 @@ export default function LoginScreen({ navigation }) {
     return Object.keys(e).length === 0;
   }
 
-  // Clear a single field error (client or server) as the user edits
   function clearFieldError(field) {
     setErrors((prev) => {
       if (!prev[field]) return prev;
@@ -48,14 +63,11 @@ export default function LoginScreen({ navigation }) {
     setServerError(null);
   }
 
-  // Route backend error response to the right UI slot
   function handleApiError(err) {
     const data = err.response?.data;
     if (data?.errors && Object.keys(data.errors).length > 0) {
-      // Field-level errors from MethodArgumentNotValidException handler
       setErrors((prev) => ({ ...prev, ...data.errors }));
     } else {
-      // Non-field error: wrong credentials, account locked, server fault, etc.
       setServerError(
         data?.message ?? "Login failed. Please check your credentials.",
       );
@@ -68,9 +80,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const res = await authApi.login(email.trim().toLowerCase(), password);
-      // const token = res.data?.token ?? res.data?.accessToken ?? res.data;
       await login(res.data);
-      // Navigation handled automatically by RootNavigator auth state
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -82,12 +92,15 @@ export default function LoginScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={isKeyboardVisible} // Only bounce if keyboard is up
+          scrollEnabled={isKeyboardVisible} // Only scroll if keyboard is up
         >
           {/* Header */}
           <View style={styles.header}>
@@ -103,7 +116,6 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.title}>Welcome back</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
 
-            {/* General server error (wrong credentials, 500, etc.) */}
             {serverError ? (
               <View style={styles.serverErrorBox}>
                 <Ionicons
@@ -159,6 +171,9 @@ export default function LoginScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           </View>
+          
+          {/* Bottom spacer helps when keyboard is up */}
+          <View style={{ height: isKeyboardVisible ? SPACING.xl : 0 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -167,7 +182,10 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.primary },
-  scroll: { flexGrow: 1, justifyContent: "center", paddingBottom: SPACING.xl },
+  scroll: { 
+    flexGrow: 1, 
+    justifyContent: "center", // Center content when not scrolling
+  },
   header: {
     alignItems: "center",
     paddingTop: SPACING.xl,
@@ -197,6 +215,17 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   title: {
     fontSize: FONTS.sizes.h2,

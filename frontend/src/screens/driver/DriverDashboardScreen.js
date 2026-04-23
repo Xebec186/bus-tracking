@@ -11,19 +11,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { driverApi } from "../../api/driverApi";
+import { unwrapApiData } from "../../api/responseUtils";
 import TripStatusBadge from "../../components/driver/TripStatusBadge";
 import { SkeletonList } from "../../components/common/LoadingSpinner";
 import { EmptyState, ErrorBanner } from "../../components/common/EmptyState";
 import { COLORS, FONTS, SPACING, RADIUS, SHADOW } from "../../constants";
 
 export default function DriverDashboardScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const busId = user?.busId ?? user?.userId; // Fall back to userId if busId not in token
+  const driverId = user?.userId;
 
   const fetchTrips = useCallback(
     async (isRefresh = false) => {
@@ -31,8 +32,9 @@ export default function DriverDashboardScreen({ navigation }) {
       else setLoading(true);
       setError(null);
       try {
-        const res = await driverApi.getTripsByBus(busId);
-        const data = res.data?.content ?? res.data ?? [];
+        const res = await driverApi.getTripsByDriver(driverId);
+        const raw = unwrapApiData(res);
+        const data = raw?.content ?? raw ?? [];
         // Sort: in-progress first, then scheduled, then rest
         const order = { IN_PROGRESS: 0, DEPARTED: 1, SCHEDULED: 2 };
         data.sort((a, b) => (order[a.status] ?? 99) - (order[b.status] ?? 99));
@@ -44,7 +46,7 @@ export default function DriverDashboardScreen({ navigation }) {
         setRefreshing(false);
       }
     },
-    [busId],
+    [driverId],
   );
 
   useEffect(() => {
@@ -66,17 +68,17 @@ export default function DriverDashboardScreen({ navigation }) {
         <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm }}>
           <TouchableOpacity
             style={styles.scanBtn}
+            onPress={() => navigation.navigate("DriverProfile")}
+            accessibilityLabel="Profile"
+          >
+            <Ionicons name="person-circle-outline" size={22} color={COLORS.white} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.scanBtn}
             onPress={() => navigation.navigate("TicketValidation")}
             accessibilityLabel="Scan ticket"
           >
             <Ionicons name="scan" size={22} color={COLORS.white} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={logout}
-            accessibilityLabel="Log out"
-          >
-            <Ionicons name="log-out-outline" size={22} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -110,8 +112,8 @@ export default function DriverDashboardScreen({ navigation }) {
       <View style={styles.busCard}>
         <Ionicons name="bus" size={28} color={COLORS.primary} />
         <View style={{ flex: 1, marginLeft: SPACING.md }}>
-          <Text style={styles.busLabel}>Assigned Bus</Text>
-          <Text style={styles.busId}>Bus #{busId ?? "—"}</Text>
+          <Text style={styles.busLabel}>Driver Account</Text>
+          <Text style={styles.busId}>Driver #{driverId ?? "—"}</Text>
         </View>
         <View style={styles.tripCount}>
           <Text style={styles.tripCountNum}>{trips.length}</Text>
@@ -211,7 +213,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.white,
   },
-  logoutBtn: { padding: SPACING.sm },
   scanBtn: {
     padding: SPACING.sm,
     backgroundColor: "rgba(255,255,255,0.2)",
