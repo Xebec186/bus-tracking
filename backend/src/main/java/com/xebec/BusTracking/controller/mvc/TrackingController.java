@@ -7,13 +7,13 @@ import com.xebec.BusTracking.repository.BusLocationRepository;
 import com.xebec.BusTracking.repository.BusRepository;
 import com.xebec.BusTracking.repository.RouteRepository;
 import com.xebec.BusTracking.repository.TripRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -95,7 +95,7 @@ public class TrackingController {
 
         try {
             model.addAttribute("busLocationsJson", objectMapper.writeValueAsString(mapPoints));
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.error("Error serializing bus locations", e);
             model.addAttribute("busLocationsJson", "[]");
         }
@@ -123,7 +123,7 @@ public class TrackingController {
 
         try {
             model.addAttribute("routesJson", objectMapper.writeValueAsString(routeData));
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.error("Error serializing route data", e);
             model.addAttribute("routesJson", "[]");
         }
